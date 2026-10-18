@@ -14,14 +14,14 @@ from typing import Any, cast
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from autoscan.prediction.base import Row, flatten_rows
-from autoscan.prediction.pareto import pareto_front
-from autoscan.prediction.scaling_law_fit import (
+from extrapolaw.prediction.base import Row, flatten_rows
+from extrapolaw.prediction.pareto import pareto_front
+from extrapolaw.prediction.scaling_law_fit import (
     LogLogPowerLawFit,
     fit_power_law,
     predict_from_loglog_fit,
 )
-from autoscan.space import HPOFloat, HPOInteger, SearchSpace
+from extrapolaw.space import HPOFloat, HPOInteger, SearchSpace
 
 #: Chinchilla approach 1 reads the learning-curve envelope at this many log-spaced
 #: flops values.

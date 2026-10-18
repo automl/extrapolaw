@@ -230,9 +230,9 @@ def _train_gp(
     from botorch.fit import fit_gpytorch_mll
     from gpytorch.mlls import ExactMarginalLogLikelihood
 
-    from autoscan.optimizers.models.gp import make_default_single_obj_gp
-    from autoscan.space import ConfigEncoder
-    from autoscan.utils.power_law import fit_power_law_mean_params
+    from extrapolaw.optimizers.models.gp import make_default_single_obj_gp
+    from extrapolaw.space import ConfigEncoder
+    from extrapolaw.utils.power_law import fit_power_law_mean_params
 
     if cost_estimator is None:
         raise ValueError("cost_estimator is required for GP posterior prediction")
@@ -310,8 +310,8 @@ def _load_gp_fit(
 ) -> GPPosteriorFit | None:
     import torch
 
-    from autoscan.optimizers.models.gp import make_default_single_obj_gp
-    from autoscan.space import ConfigEncoder
+    from extrapolaw.optimizers.models.gp import make_default_single_obj_gp
+    from extrapolaw.space import ConfigEncoder
 
     if not path.exists():
         return None

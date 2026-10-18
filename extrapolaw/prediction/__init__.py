@@ -4,7 +4,7 @@ The optimizers decide which runs to evaluate, the predictors here fit a scaling 
 them and predict, at a target budget, the best loss (`LOSS`), the compute optimal model
 size and data (`COARSE`), or the compute optimal configuration (`FULL`). Each predictor
 lives in its own module (`power_law`, `chinchilla3`, `gp`) as a pair of `fit_*` and
-`predict_*` functions per target, see [`autoscan.predict()`][autoscan.predict] for the
+`predict_*` functions per target, see [`extrapolaw.predict()`][extrapolaw.predict] for the
 high level entry point.
 """
 
@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from autoscan.prediction import chinchilla3, gp, power_law
-from autoscan.prediction.base import (
+from extrapolaw.prediction import chinchilla3, gp, power_law
+from extrapolaw.prediction.base import (
     PredictorTypes,
     Row,
     Target,
@@ -25,7 +25,7 @@ from autoscan.prediction.base import (
     flatten_rows,
     last_point_in_curve,
 )
-from autoscan.prediction.scaling_law_fit import (
+from extrapolaw.prediction.scaling_law_fit import (
     DEFAULT_EXPONENT_BOUNDS,
     ScalingLawParameters,
 )
@@ -33,8 +33,8 @@ from autoscan.prediction.scaling_law_fit import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from autoscan.space import SearchSpace
-    from autoscan.state import Trial
+    from extrapolaw.space import SearchSpace
+    from extrapolaw.state import Trial
 
 DEFAULT_PREDICTORS: dict[str, PredictorTypes] = {
     "chinchilla": PredictorTypes.CHINCHILLA3,

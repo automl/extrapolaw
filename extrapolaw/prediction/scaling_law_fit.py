@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from autoscan.utils.power_law import (
+from extrapolaw.utils.power_law import (
     LogLogPowerLawFit,
     PowerLawMeanParams,
     fit_power_law,

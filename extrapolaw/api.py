@@ -720,7 +720,7 @@ def predict(  # noqa: PLR0913
     budget.
 
     ```python
-    predictions = autoscan.predict(
+    predictions = extrapolaw.predict(
         "results",
         target_flops=[1e20, 1e21],
         predictor="chinchilla3",
@@ -732,13 +732,13 @@ def predict(  # noqa: PLR0913
     ```
 
     Args:
-        root_directory: Root directory of the AutoScAn run. The flops of a trial are
+        root_directory: Root directory of the Extrapolaw run. The flops of a trial are
             the cost it reported, or what `cost_estimator` gives for it.
         target_flops: The compute budget(s) to predict at.
-        predictor: A [`PredictorTypes`][autoscan.prediction.PredictorTypes] or its
+        predictor: A [`PredictorTypes`][extrapolaw.prediction.PredictorTypes] or its
             name (`"power_law"`, `"chinchilla3"`, `"gp_posterior"`), or `"auto"` for
             the one paired with the run's optimizer, `"power_law"` otherwise.
-        targets: The [`Target`][autoscan.prediction.Target]s to predict. By default
+        targets: The [`Target`][extrapolaw.prediction.Target]s to predict. By default
             whatever the predictor provides, without `COARSE` when the trials have no
             model size and data.
         params_estimator: Called as `params_estimator(**config)` for the parameter
@@ -758,11 +758,11 @@ def predict(  # noqa: PLR0913
         cache_dir: Where `"gp_posterior"` checkpoints its fit and predictions.
 
     Returns:
-        One [`Prediction`][autoscan.prediction.Prediction] per target budget.
+        One [`Prediction`][extrapolaw.prediction.Prediction] per target budget.
     """
     import numpy as np
 
-    from autoscan.prediction import (
+    from extrapolaw.prediction import (
         DEFAULT_PREDICTORS,
         PredictorTypes,
         Target,
@@ -770,15 +770,15 @@ def predict(  # noqa: PLR0913
         get_predictor_type,
         rows_from_trials,
     )
-    from autoscan.space.autoscan_spaces.autoscan_space import (
-        convert_autoscan_to_classic_search_space,
+    from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import (
+        convert_extrapolaw_to_classic_search_space,
     )
 
     root_directory = Path(root_directory)
     try:
-        state = AutoScAnState.create_or_load(path=root_directory, load_only=True)
+        state = ExtrapolawState.create_or_load(path=root_directory, load_only=True)
     except FileNotFoundError as e:
-        raise FileNotFoundError(f"No AutoScAn run found at {root_directory}.") from e
+        raise FileNotFoundError(f"No Extrapolaw run found at {root_directory}.") from e
 
     if params_estimator is not None:
         params_estimator = CostEstimator.from_callable(params_estimator)
@@ -815,7 +815,7 @@ def predict(  # noqa: PLR0913
     # if Target.FULL in targets or predictor_type == PredictorTypes.GP_POSTERIOR:
     saved_space = state.lock_and_get_search_space()
     if isinstance(saved_space, PipelineSpace):
-        space = convert_autoscan_to_classic_search_space(saved_space)
+        space = convert_extrapolaw_to_classic_search_space(saved_space)
     else:
         space = saved_space
     if space is None:

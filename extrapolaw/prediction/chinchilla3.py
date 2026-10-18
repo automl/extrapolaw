@@ -11,9 +11,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from autoscan.prediction.base import Row, last_point_in_curve
-from autoscan.prediction.pareto import pareto_front
-from autoscan.prediction.scaling_law_fit import (
+from extrapolaw.prediction.base import Row, last_point_in_curve
+from extrapolaw.prediction.pareto import pareto_front
+from extrapolaw.prediction.scaling_law_fit import (
     ScalingLawParameters,
     get_power_law_curvature,
 )

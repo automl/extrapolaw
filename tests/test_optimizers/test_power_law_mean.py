@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from autoscan.optimizers.models.gp import PowerLawMean, make_default_single_obj_gp
-from autoscan.space import ConfigEncoder, HPOFloat
+from extrapolaw.optimizers.models.gp import PowerLawMean, make_default_single_obj_gp
+from extrapolaw.space import ConfigEncoder, HPOFloat
 
 
 def _cost(n_params: float, n_data: float) -> float:

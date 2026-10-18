@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import autoscan
-from autoscan.prediction import (
+import extrapolaw
+from extrapolaw.prediction import (
     PredictorTypes,
     Row,
     ScalingLawParameters,
@@ -16,8 +16,8 @@ from autoscan.prediction import (
     gp,
     power_law,
 )
-from autoscan.prediction.scaling_law_fit import fit_power_law, predict_from_loglog_fit
-from autoscan.space import HPOFloat, SearchSpace
+from extrapolaw.prediction.scaling_law_fit import fit_power_law, predict_from_loglog_fit
+from extrapolaw.space import HPOFloat, SearchSpace
 
 TRUE_LAW = ScalingLawParameters(E=1.69, A=406.4, B=410.7, alpha=0.34, beta=0.28)
 
@@ -176,7 +176,7 @@ def test_chinchilla3_needs_three_rows() -> None:
 
 
 def _import_run(root: Path, n: int = 60) -> None:
-    autoscan.import_trials(
+    extrapolaw.import_trials(
         [
             (
                 {"n_params": r[0], "n_data": r[1]},
@@ -195,14 +195,14 @@ def test_predict_from_a_run(tmp_path: Path) -> None:
     _import_run(root)
 
     # "auto" is the power law. Without a model size, COARSE is left out
-    (power,) = autoscan.predict(root, 1e21)
+    (power,) = extrapolaw.predict(root, 1e21)
     assert power.loss is not None
     assert power.loss_interval is not None
     assert power.config is not None
     assert power.n_params is None
     assert set(power.info or {}) == {Target.LOSS, Target.FULL}
 
-    predictions = autoscan.predict(
+    predictions = extrapolaw.predict(
         root,
         [1e20, 1e21],
         predictor="chinchilla3",
@@ -215,16 +215,16 @@ def test_predict_from_a_run(tmp_path: Path) -> None:
     assert predictions[1].n_params == pytest.approx(n_params, rel=0.05)
 
     with pytest.raises(ValueError, match="does not predict"):
-        autoscan.predict(root, 1e21, predictor="chinchilla3", targets=[Target.FULL])
+        extrapolaw.predict(root, 1e21, predictor="chinchilla3", targets=[Target.FULL])
     with pytest.raises(ValueError, match="Unknown predictor"):
-        autoscan.predict(root, 1e21, predictor="nope")
+        extrapolaw.predict(root, 1e21, predictor="nope")
 
 
 def test_predict_gp_posterior_from_a_run(tmp_path: Path) -> None:
     root = tmp_path / "run"
     _import_run(root, n=15)
 
-    (prediction,) = autoscan.predict(
+    (prediction,) = extrapolaw.predict(
         root,
         1e17,
         predictor="gp_posterior",

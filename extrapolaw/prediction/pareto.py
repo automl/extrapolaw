@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from autoscan.prediction.scaling_law_fit import LogLogPowerLawFit, fit_power_law
+from extrapolaw.prediction.scaling_law_fit import LogLogPowerLawFit, fit_power_law
 
 #: Reference point of the hypervolume, just outside the normalized unit square so
 #: the worst valid model still contributes a non-zero area.
