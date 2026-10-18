@@ -14,6 +14,8 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import attr
+import torch
 from carbs import (
     CARBS,
     CARBSParams,
@@ -41,6 +43,32 @@ if TYPE_CHECKING:
     from extrapolaw.state.pipeline_eval import UserResultDict
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(auto_attribs=True, hash=True)
+class PowerOfBaseSpace(LogSpace):
+    """A `LogSpace` whose values are integer powers of `base` within `[min, max]`.
+
+    The exponent is rounded instead of the value, so CARBS also optimizes its acquisition
+    on that grid and only suggests powers of the base.
+    """
+
+    def _exponent_bounds(self) -> tuple[int, int]:
+        return (
+            math.ceil(math.log(self.min, self.base) - 1e-9),
+            math.floor(math.log(self.max, self.base) + 1e-9),
+        )
+
+    def param_from_basic(self, value: float, is_rounded: bool = True) -> float:
+        exponent = value * self.scale
+        if not is_rounded:
+            return self.base**exponent
+        low, high = self._exponent_bounds()
+        return self.base ** min(max(round(exponent), low), high)
+
+    def round_tensor_in_basic(self, value: torch.Tensor) -> torch.Tensor:
+        low, high = self._exponent_bounds()
+        return torch.round(value * self.scale).clamp(low, high) / self.scale
 
 
 def _center(hp: HPOFloat | HPOInteger, lower: float, upper: float) -> float:
@@ -73,9 +101,13 @@ def convert_space_to_carbs_space(
         search_center = hp.prior if hp.prior is not None else _center(hp, lower, upper)
         if hp.log:
             base = hp.log_base if hp.log_base is not None else 10
+            # An Integer with a `log_base` only takes powers of that base
+            space_cls = (
+                PowerOfBaseSpace if is_integer and hp.log_base is not None else LogSpace
+            )
             yield Param(
                 name=name,
-                space=LogSpace(
+                space=space_cls(
                     scale=math.log(math.e, base),
                     min=lower,
                     max=upper,

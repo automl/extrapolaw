@@ -74,6 +74,31 @@ def test_batch_gets_consecutive_ids() -> None:
     assert [s.id for s in batch] == ["0", "1", "2"]
 
 
+def test_integers_with_a_log_base_are_powers_of_it(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    space = SearchSpace(
+        {
+            "layers": HPOInteger(2, 32, log=True, log_base=2, is_compute_scaling=True),
+            "width": HPOInteger(16, 1024, log=True),
+            "lr": HPOFloat(1e-5, 1e-1, log=True),
+        }
+    )
+    optimizer = carbs(space, num_random_samples=3)
+
+    # Past `num_random_samples`, CARBS also suggests from its surrogate
+    trials: dict[str, Trial] = {}
+    for _ in range(8):
+        sampled = optimizer(trials, None)
+        layers = sampled.config["layers"]
+        assert isinstance(layers, int)
+        assert layers in {2, 4, 8, 16, 32}
+        cost = float(layers * sampled.config["width"])
+        trials[sampled.id] = _trial(sampled, objective=1.0 / cost, cost=cost)
+
+    # Without a `log_base`, any integer can be suggested
+    assert any(t.config["width"] & (t.config["width"] - 1) for t in trials.values())
+
+
 def test_unsupported_spaces_are_rejected() -> None:
     with pytest.raises(NotImplementedError, match="'opt' is a HPOCategorical"):
         carbs(SearchSpace({"opt": HPOCategorical(["adam", "sgd"])}))
