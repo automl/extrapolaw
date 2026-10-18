@@ -53,7 +53,7 @@ def _center(hp: HPOFloat | HPOInteger, lower: float, upper: float) -> float:
         # Stay on a power of the base, rounding down so that shrinking reaches `lower`
         exponent_lower = round(math.log(lower, hp.log_base))
         exponent_upper = round(math.log(upper, hp.log_base))
-        center = hp.log_base ** ((exponent_lower + exponent_upper) // 2)
+        center = hp.log_base ** round((exponent_lower + exponent_upper) / 2)
     return int(center) if isinstance(hp, HPOInteger) else center
 
 
