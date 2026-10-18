@@ -6,7 +6,7 @@ import functools
 import logging
 import shutil
 import warnings
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Concatenate, Literal
 
@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from ConfigSpace import ConfigurationSpace
 
     from extrapolaw.optimizers.algorithms import CustomOptimizer
+    from extrapolaw.prediction import Prediction, PredictorTypes, Target
     from extrapolaw.space import SearchSpace
     from extrapolaw.state.pipeline_eval import EvaluatePipelineReturn, UserResultDict
 
@@ -698,6 +699,149 @@ def analyze(root_directory: str | Path) -> None:
     logger.info(f"The summary has been refreshed at: {summary.summary_dir}.")
 
 
+def predict(  # noqa: PLR0913
+    root_directory: str | Path,
+    target_flops: float | Sequence[float],
+    *,
+    predictor: str | PredictorTypes = "auto",
+    targets: Iterable[Target] | None = None,
+    params_estimator: Callable[..., float] | None = None,
+    data_parameter_name: str | None = None,
+    cost_estimator: Callable[..., float] | None = None,
+    learning_curves: bool = True,
+    best_loss_guess: float | None = None,
+    exponent_bounds: tuple[float, float] | None = None,
+    seed: int = 0,
+    cache_dir: str | Path | None = None,
+) -> list[Prediction]:
+    """Extrapolate the evaluated trials of a run to larger compute budgets.
+
+    The predictor is fitted once per target on the trials, then queried at every
+    budget.
+
+    ```python
+    predictions = autoscan.predict(
+        "results",
+        target_flops=[1e20, 1e21],
+        predictor="chinchilla3",
+        params_estimator=estimate_params,
+        data_parameter_name="n_data",
+    )
+    for p in predictions:
+        print(p.target_flops, p.loss, p.n_params, p.n_data)
+    ```
+
+    Args:
+        root_directory: Root directory of the AutoScAn run. The flops of a trial are
+            the cost it reported, or what `cost_estimator` gives for it.
+        target_flops: The compute budget(s) to predict at.
+        predictor: A [`PredictorTypes`][autoscan.prediction.PredictorTypes] or its
+            name (`"power_law"`, `"chinchilla3"`, `"gp_posterior"`), or `"auto"` for
+            the one paired with the run's optimizer, `"power_law"` otherwise.
+        targets: The [`Target`][autoscan.prediction.Target]s to predict. By default
+            whatever the predictor provides, without `COARSE` when the trials have no
+            model size and data.
+        params_estimator: Called as `params_estimator(**config)` for the parameter
+            count of a trial, `extra["n_param"]` of its report is used without it.
+        data_parameter_name: The parameter that sets the amount of training data,
+            taken from the optimizer of the run if it has one, and from
+            `extra["n_data"]` of the reports otherwise.
+        cost_estimator: Called as `cost_estimator(**config)` for the flops of trials
+            that reported no cost. Needed by `"gp_posterior"`.
+        learning_curves: Fit the `COARSE` power law on the envelope of the learning
+            curves, reported as rows of `(n_data, flops, loss, ...)`, when there are
+            any.
+        best_loss_guess: Upper bound of the irreducible loss of `"chinchilla3"`, the
+            lowest observed loss by default.
+        exponent_bounds: Bounds of the exponents of `"chinchilla3"`.
+        seed: Seed of the `"gp_posterior"` candidate pool.
+        cache_dir: Where `"gp_posterior"` checkpoints its fit and predictions.
+
+    Returns:
+        One [`Prediction`][autoscan.prediction.Prediction] per target budget.
+    """
+    import numpy as np
+
+    from autoscan.prediction import (
+        DEFAULT_PREDICTORS,
+        PredictorTypes,
+        Target,
+        fit_and_predict,
+        get_predictor_type,
+        rows_from_trials,
+    )
+    from autoscan.space.autoscan_spaces.autoscan_space import (
+        convert_autoscan_to_classic_search_space,
+    )
+
+    root_directory = Path(root_directory)
+    try:
+        state = AutoScAnState.create_or_load(path=root_directory, load_only=True)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"No AutoScAn run found at {root_directory}.") from e
+
+    if params_estimator is not None:
+        params_estimator = CostEstimator.from_callable(params_estimator)
+    if cost_estimator is not None:
+        cost_estimator = CostEstimator.from_callable(cost_estimator)
+    optimizer_info = state.lock_and_get_optimizer_info()
+
+    if data_parameter_name is None:
+        stored = optimizer_info.get("info", {}).get("data_parameter_name")
+        data_parameter_name = stored if isinstance(stored, str) else None
+    if predictor == "auto":
+        predictor = DEFAULT_PREDICTORS.get(
+            optimizer_info["name"], PredictorTypes.POWER_LAW
+        )
+    predictor_type = get_predictor_type(predictor)
+
+    rows, curves, configs = rows_from_trials(
+        state.lock_and_read_trials().values(),
+        params_estimator=params_estimator,
+        data_parameter_name=data_parameter_name,
+        cost_estimator=cost_estimator,
+    )
+    if targets is None:
+        has_scale = any(np.isfinite(r[0]) and np.isfinite(r[1]) for r in rows)
+        targets = [
+            t
+            for t in Target
+            if t in predictor_type.provides
+            and (t != Target.COARSE or has_scale or params_estimator is not None)
+        ]
+    targets = list(targets)
+
+    space: SearchSpace | None = None
+    # if Target.FULL in targets or predictor_type == PredictorTypes.GP_POSTERIOR:
+    saved_space = state.lock_and_get_search_space()
+    if isinstance(saved_space, PipelineSpace):
+        space = convert_autoscan_to_classic_search_space(saved_space)
+    else:
+        space = saved_space
+    if space is None:
+        raise ValueError(
+            f"No search space of a classic HPO kind saved at {root_directory},"
+            " which predicting the full configuration needs."
+        )
+
+    budgets = [target_flops] if isinstance(target_flops, int | float) else target_flops
+    return fit_and_predict(
+        predictor_type,
+        [float(flops) for flops in budgets],
+        targets=targets,
+        rows=rows,
+        configs=configs,
+        learning_curve_rows=curves if learning_curves else None,
+        space=space,
+        params_estimator=params_estimator,
+        cost_estimator=cost_estimator,
+        best_loss_guess=best_loss_guess,
+        exponent_bounds=exponent_bounds,
+        seed=seed,
+        cache_dir=None if cache_dir is None else Path(cache_dir),
+    )
+
+
 def import_trials(  # noqa: C901
     evaluated_trials: Sequence[tuple[Mapping[str, Any], UserResultDict],],
     root_directory: Path | str,
@@ -1262,6 +1406,7 @@ __all__ = [
     "load_config",
     "load_optimizer_info",
     "load_pipeline_space",
+    "predict",
     "run",
     "save_pipeline_results",
 ]

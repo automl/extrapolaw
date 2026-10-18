@@ -478,6 +478,10 @@ class BayesianOptimization(ScalingOptimizer):
             )
         else:
             if cost_estimator is None:
+                logger.warning(
+                    "No cost estimator, the GP falls back to a zero prior mean instead"
+                    " of the power law in the cost."
+                )
                 gp = make_default_single_obj_gp(x=data.x, y=data.y, encoder=encoder)
             else:
                 # Fit a power law to determine GP mean prior

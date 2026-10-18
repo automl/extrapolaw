@@ -98,11 +98,12 @@ class PowerLawMean(GpMean):
         super().__init__()
         self.encoder = encoder
         self.cost_estimator = cost_estimator
-        # Buffers, not parameters: the power law is fixed, not learned with the GP
-        self.register_buffer("slope", torch.tensor(slope, dtype=torch.float64))
-        self.register_buffer("bias", torch.tensor(bias, dtype=torch.float64))
+        # Buffers, not parameters: the power law is fixed, not learned with the GP. The
+        # names match the GP checkpoints written with NePS, so those still load
+        self.register_buffer("fixed_slope", torch.tensor(slope, dtype=torch.float64))
+        self.register_buffer("fixed_bias", torch.tensor(bias, dtype=torch.float64))
         self.register_buffer(
-            "reference_cost", torch.tensor(reference_cost, dtype=torch.float64)
+            "reference_flops", torch.tensor(reference_cost, dtype=torch.float64)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -114,8 +115,8 @@ class PowerLawMean(GpMean):
                 dtype=x.dtype,
                 device=x.device,
             )
-        log_cost = torch.log((costs / self.reference_cost).clamp(min=1e-10))
-        return (self.slope * log_cost + self.bias).view(batch_shape)
+        log_cost = torch.log((costs / self.reference_flops).clamp(min=1e-10))
+        return (self.fixed_slope * log_cost + self.fixed_bias).view(batch_shape)
 
 
 def make_default_single_obj_gp(

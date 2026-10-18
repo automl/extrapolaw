@@ -14,6 +14,7 @@ from extrapolaw.api import (
     load_config,
     load_optimizer_info,
     load_pipeline_space,
+    predict,
     run,
     save_pipeline_results,
 )
@@ -73,6 +74,7 @@ __all__ = [
     "load_optimizer_info",
     "load_pipeline_space",
     "plot",
+    "predict",
     "run",
     "save_pipeline_results",
     "status",
