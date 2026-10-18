@@ -578,7 +578,8 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
     if _cost_estimator is not None:
         _eval = _with_estimated_cost(_eval, _cost_estimator)
     if isinstance(space, PipelineSpace):
-        _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)  # TODO
+        pass
+        # _eval = adjust_evaluation_pipeline_for_autoscan_space(_eval, space)  # TODO
 
     _launch_runtime(
         evaluation_fn=_eval,  # type: ignore
