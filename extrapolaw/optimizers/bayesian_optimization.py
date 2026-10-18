@@ -546,7 +546,9 @@ class BayesianOptimization(ScalingOptimizer):
 
                 lower = [domain.lower for domain in encoder.domains]
                 upper = [domain.upper for domain in encoder.domains]
-                bounds = torch.tensor([lower, upper], dtype=torch.float64)
+                bounds = torch.tensor(
+                    [lower, upper], dtype=torch.float64, device=data.x.device
+                )
 
                 if encoded_constraints_func is None:
                     optimal_inputs, optimal_outputs = get_optimal_samples(
@@ -591,7 +593,9 @@ class BayesianOptimization(ScalingOptimizer):
 
                 lower = [domain.lower for domain in encoder.domains]
                 upper = [domain.upper for domain in encoder.domains]
-                bounds = torch.tensor([lower, upper], dtype=torch.float64)
+                bounds = torch.tensor(
+                    [lower, upper], dtype=torch.float64, device=data.x.device
+                )
 
                 candidate_set = (
                     draw_sobol_samples(bounds=bounds, n=512, q=1)
@@ -622,7 +626,9 @@ class BayesianOptimization(ScalingOptimizer):
 
                 lower = [domain.lower for domain in encoder.domains]
                 upper = [domain.upper for domain in encoder.domains]
-                bounds = torch.tensor([lower, upper], dtype=torch.float64)
+                bounds = torch.tensor(
+                    [lower, upper], dtype=torch.float64, device=data.x.device
+                )
 
                 # Build a candidate set restricted to configs within 3x of C_target.
                 raw_candidates = (
@@ -644,7 +650,9 @@ class BayesianOptimization(ScalingOptimizer):
                     except Exception:  # noqa: BLE001
                         flop_vals.append(0.0)  # to keep dim consistent
                 log_flops = (
-                    torch.tensor(flop_vals, dtype=torch.float64).clamp(min=1).log()
+                    torch.tensor(flop_vals, dtype=torch.float64, device=data.x.device)
+                    .clamp(min=1)
+                    .log()
                 )
                 log_target = math.log(target_flops)
                 mask = (log_flops - log_target).abs() < math.log(
