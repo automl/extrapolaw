@@ -39,12 +39,24 @@ def fit_power_law(
     fit_x = fit_x[mask]
     fit_y = fit_y[mask]
 
-    if len(fit_x) < 2 or len(np.unique(fit_x)) < 2:
+    if len(fit_x) == 0:
         return None
 
     if log_scale:
         fit_x = np.log10(fit_x)
         fit_y = np.log10(fit_y)
+
+    if len(np.unique(fit_x)) < 2:
+        # A single FLOPs value can't determine a slope: fall back to a flat fit
+        # that predicts the observed (mean) metric everywhere.
+        return LogLogPowerLawFit(
+            slope=0.0,
+            intercept=float(np.mean(fit_y)),
+            r_squared=0.0,
+            slope_std_err=float("nan"),
+            intercept_std_err=float("nan"),
+            num_points=len(fit_x),
+        )
 
     result: Any = linregress(fit_x, fit_y)
 
