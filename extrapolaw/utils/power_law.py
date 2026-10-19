@@ -72,7 +72,10 @@ def fit_power_law(
 
 @dataclass
 class PowerLawMeanParams:
-    """Power-law GP mean prior (slope/intercept) plus the FLOPs used to derive it."""
+    """Power-law GP mean prior (slope/intercept), plus the FLOPs of all valid trials.
+
+    The fit only uses the Pareto optimal ones, see `fit.num_points`.
+    """
 
     slope: float
     intercept: float
@@ -88,7 +91,10 @@ def fit_power_law_mean_params(
     default_slope: float = -0.5,
     default_intercept: float = 5.0,
 ) -> PowerLawMeanParams:
-    """Derive the (slope, intercept, min_flops) power-law prior."""
+    """Derive the (slope, intercept, min_flops) power-law prior.
+
+    The power law is fit on the (flops, metric) Pareto front of the configurations.
+    """
     flops_list: list[float] = []
     metrics_list: list[float] = []
     for config, metric in zip(configs, metrics, strict=False):
@@ -106,12 +112,21 @@ def fit_power_law_mean_params(
             flops_list.append(float(flop_val))
             metrics_list.append(float(metric))
 
+    # Imported here, as `autoscan.prediction` imports this module
+    from autoscan.prediction.pareto import non_dominated_mask
+
+    # The power law is the compute optimal frontier, so only the Pareto optimal
+    # trials are fit, dominated ones would bias it towards worse losses
+    front = non_dominated_mask(flops_list, metrics_list)
+    front_flops = np.array(flops_list)[front]
+    front_metrics = np.array(metrics_list)[front]
+
     slope, intercept = default_slope, default_intercept
     fit_result = None
-    if len(flops_list) >= 2 and len(np.unique(flops_list)) >= 2:
+    if len(front_flops) >= 2 and len(np.unique(front_flops)) >= 2:
         fit_result = fit_power_law(
-            flops=np.array(flops_list),
-            y_metric=np.array(metrics_list),
+            flops=front_flops,
+            y_metric=front_metrics,
             log_scale=True,
         )
         if fit_result is not None:

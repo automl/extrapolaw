@@ -82,9 +82,11 @@ def default_categorical_kernel(
 class PowerLawMean(GpMean):
     """A fixed power law in the cost as the GP prior mean.
 
-    `mean = slope * log(cost / reference_cost) + bias`, with the cost of an encoded
-    configuration given by `cost_estimator`. Relative to `reference_cost`, the mean
-    stays near `bias` instead of the large values the raw log cost would give.
+    `loss = 10 ** (slope * log10(cost) + bias)`, the log-log fit of
+    `fit_power_law_mean_params()`, with the cost of an encoded configuration given by
+    `cost_estimator`. The GP models the outcomes standardized by `Standardize`, so the
+    mean is `(loss - y_mean) / y_std` with the statistics of the training outcomes.
+    Costs are clamped to `1e-10 * reference_cost` before the log.
     """
 
     def __init__(
@@ -94,6 +96,8 @@ class PowerLawMean(GpMean):
         slope: float,
         bias: float,
         reference_cost: float = 1e16,
+        y_mean: float = 0.0,
+        y_std: float = 1.0,
     ) -> None:
         super().__init__()
         self.encoder = encoder
@@ -105,6 +109,14 @@ class PowerLawMean(GpMean):
         self.register_buffer(
             "reference_flops", torch.tensor(reference_cost, dtype=torch.float64)
         )
+        # Not persistent, as they follow from the training outcomes the GP is built
+        # with, and the checkpoints written with NePS don't have them
+        self.register_buffer(
+            "y_mean", torch.tensor(y_mean, dtype=torch.float64), persistent=False
+        )
+        self.register_buffer(
+            "y_std", torch.tensor(y_std, dtype=torch.float64), persistent=False
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_shape = x.shape[:-1]
@@ -115,8 +127,9 @@ class PowerLawMean(GpMean):
                 dtype=x.dtype,
                 device=x.device,
             )
-        log_cost = torch.log((costs / self.reference_flops).clamp(min=1e-10))
-        return (self.fixed_slope * log_cost + self.fixed_bias).view(batch_shape)
+        log10_cost = torch.log10(costs.clamp(min=1e-10 * self.reference_flops))
+        loss = 10 ** (self.fixed_slope * log10_cost + self.fixed_bias)
+        return ((loss - self.y_mean) / self.y_std).view(batch_shape)
 
 
 def make_default_single_obj_gp(
@@ -132,9 +145,9 @@ def make_default_single_obj_gp(
 ) -> SingleTaskGP:
     """Default GP for single objective optimization.
 
-    With a `cost_estimator`, the prior mean is the power law `mean_slope *
-    log(cost / min_cost) + mean_bias`, see `PowerLawMean`. It is not used for purely
-    categorical spaces.
+    With a `cost_estimator`, the prior mean is the power law `loss = 10 ** (mean_slope *
+    log10(cost) + mean_bias)`, standardized like the outcomes by the default
+    `Standardize`, see `PowerLawMean`. It is not used for purely categorical spaces.
     """
     if y.ndim == 1:
         y = y.unsqueeze(-1)
@@ -150,17 +163,19 @@ def make_default_single_obj_gp(
         else:
             numerics.append(encoder.index_of[hp_name])
 
-    mean_module = (
-        None
-        if cost_estimator is None
-        else PowerLawMean(
+    mean_module = None
+    if cost_estimator is not None:
+        # The statistics `Standardize` computes for the outcomes the GP models
+        y_std = y.std().item() if len(y) > 1 else 1.0
+        mean_module = PowerLawMean(
             encoder=encoder,
             cost_estimator=cost_estimator,
             slope=mean_slope,
             bias=mean_bias,
             reference_cost=min_cost,
+            y_mean=y.mean().item(),
+            y_std=y_std if y_std >= 1e-8 else 1.0,
         )
-    )
 
     # Purely vectorial
     if len(categoricals) == 0:
