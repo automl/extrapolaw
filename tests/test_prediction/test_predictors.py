@@ -126,6 +126,30 @@ def test_power_law_full_clips_into_the_space() -> None:
     assert 1e8 <= config["n_data"] <= 1e11
 
 
+def test_power_law_full_fits_linear_hps_in_linear_space() -> None:
+    """A linear HP keeps its zero values and is extrapolated linearly, not via 10**."""
+    space = SearchSpace(
+        {
+            "n_params": HPOFloat(1e6, 1e9, log=True),
+            "width": HPOInteger(0, 5),  # ordinal index, 0 is a valid value
+            "beta1": HPOFloat(0.8, 0.99),
+        }
+    )
+    flops = [1e15, 1e16, 1e17, 1e18]
+    configs = [
+        {"n_params": 1e6 * 10**i, "width": w, "beta1": 0.9}
+        for i, w in enumerate([0, 0, 1, 2])
+    ]
+    fit = power_law.fit_full(
+        space=space, configs=configs, losses=[4.0, 3.0, 2.0, 1.0], flops=flops
+    )
+    assert fit.hp_fits["width"].num_points == 4
+
+    config = power_law.predict_full(fit, space, 1e18)["extrapolated_config"]
+    assert config["beta1"] == pytest.approx(0.9)
+    assert 0 <= config["width"] <= 5
+
+
 def test_gp_posterior_predicts_a_feasible_config(tmp_path: Path) -> None:
     rows = _synthetic(n=20)
     fit = gp.fit(

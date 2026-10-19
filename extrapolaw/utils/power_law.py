@@ -31,7 +31,11 @@ def fit_power_law(
     """Fit log10(metric) = slope * log10(flops) + intercept with quality stats."""
     fit_x = np.asarray(flops, dtype=float)
     fit_y = np.asarray(y_metric, dtype=float)
-    mask = np.isfinite(fit_x) & np.isfinite(fit_y) & (fit_x > 0) & (fit_y > 0)
+    mask = np.isfinite(fit_x) & np.isfinite(fit_y) & (fit_x > 0)
+    if log_scale:
+        # Only the log needs a positive metric; a linear fit keeps zeros/negatives
+        # (e.g. ordinal HP indices starting at 0).
+        mask &= fit_y > 0
     fit_x = fit_x[mask]
     fit_y = fit_y[mask]
 

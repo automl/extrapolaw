@@ -351,6 +351,17 @@ def compute_full_pareto(
     return pareto_ids, pareto_configs, pareto_flops, pareto_losses
 
 
+def _fits_in_log_space(param: Any) -> bool:
+    """Whether an HP's power law is fit (and so extrapolated) in log-log space.
+
+    Only the parameter's own declared log flag decides. `is_scaling` used to force
+    it too, which put ordinal-index HPs (e.g. OpenCLIP's vision_width/text_width,
+    indices into WIDTH_CHOICES) in log space, where a power law in the index is not
+    a power law in the value.
+    """
+    return isinstance(param, HPOInteger | HPOFloat) and param.log
+
+
 def fit_hp_power_laws(
     *,
     space: SearchSpace,
@@ -368,14 +379,10 @@ def fit_hp_power_laws(
                 raise ValueError(f"HP '{param_name}' is missing from config: {config}")
             hp_values_param.append(float(config[param_name]))
 
-        # Only the parameter's own declared log flag decides the fit space.
-        # `is_scaling` used to force it too, which put ordinal-index HPs (e.g.
-        # OpenCLIP's vision_width/text_width, indices into WIDTH_CHOICES) in log
-        # space, where a power law in the index is not a power law in the value.
-        log = isinstance(param, HPOInteger | HPOFloat) and param.log
-
         fit_result = fit_power_law(
-            x_flops, np.asarray(hp_values_param, dtype=float), log_scale=log
+            x_flops,
+            np.asarray(hp_values_param, dtype=float),
+            log_scale=_fits_in_log_space(param),
         )
         if fit_result is None:
             raise ValueError(
@@ -416,7 +423,9 @@ def predict_full(
     extrapolated_config: dict[str, Any] = {}
     for param_name, param in space.searchables.items():
         predicted_hp, _, _ = predict_from_loglog_fit(
-            fit.hp_fits[param_name], target_flops
+            fit.hp_fits[param_name],
+            target_flops,
+            log_scale=_fits_in_log_space(param),
         )
         predicted_hp = np.clip(predicted_hp, param.domain.lower, param.domain.upper)
         extrapolated_config[param_name] = param.domain.cast_one(
