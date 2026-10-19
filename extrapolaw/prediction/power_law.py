@@ -416,6 +416,20 @@ def fit_full(
     )
 
 
+def _snap_to_log_base_grid(value: float, param: Any) -> float:
+    """Round an integer log-base HP to the nearest power of its base.
+
+    The optimizers only sample such HPs on that grid (e.g. 16, 32, 64 for base 2), but
+    the log-log extrapolation lands in between (e.g. 20); round the exponent so the
+    predicted config stays on the grid. Rounding is in log space, so 20 -> 16, 23 -> 32.
+    """
+    domain = param.domain
+    if not (domain.is_int and domain.log_base is not None and value > 0):
+        return value
+    exponent = round(np.log(value) / np.log(domain.log_base))
+    return float(np.clip(domain.log_base**exponent, domain.lower, domain.upper))
+
+
 def predict_full(
     fit: PowerLawFullFit, space: SearchSpace, target_flops: float
 ) -> dict[str, Any]:
@@ -428,6 +442,7 @@ def predict_full(
             log_scale=_fits_in_log_space(param),
         )
         predicted_hp = np.clip(predicted_hp, param.domain.lower, param.domain.upper)
+        predicted_hp = _snap_to_log_base_grid(float(predicted_hp), param)
         extrapolated_config[param_name] = param.domain.cast_one(
             float(predicted_hp), frm=param.domain
         )
