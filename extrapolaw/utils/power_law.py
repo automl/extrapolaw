@@ -112,8 +112,8 @@ def fit_power_law_mean_params(
             flops_list.append(float(flop_val))
             metrics_list.append(float(metric))
 
-    # Imported here, as `autoscan.prediction` imports this module
-    from autoscan.prediction.pareto import non_dominated_mask
+    # Imported here, as `extrapolaw.prediction` imports this module
+    from extrapolaw.prediction.pareto import non_dominated_mask
 
     # The power law is the compute optimal frontier, so only the Pareto optimal
     # trials are fit, dominated ones would bias it towards worse losses

@@ -30,6 +30,7 @@ from extrapolaw.env import (
     MAX_RETRIES_WORKER_CHECK_SHOULD_STOP,
 )
 from extrapolaw.exceptions import (
+    BudgetExhaustedError,
     ExtrapolawError,
     TrialAlreadyExistsError,
     WorkerFailedToGetPendingTrialsError,
@@ -735,6 +736,10 @@ class DefaultWorker:
                 if trial_to_eval == "break":
                     break
                 _repeated_fail_get_next_trial_count = 0
+            except BudgetExhaustedError as e:
+                # Retrying won't free up budget, so stop instead of sampling again
+                logger.info("Worker '%s' stops: %s", self.worker_id, e)
+                break
             except Exception as e:
                 _repeated_fail_get_next_trial_count += 1
                 if isinstance(e, portalocker.exceptions.LockException):

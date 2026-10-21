@@ -91,6 +91,11 @@ def _bo(  # noqa: C901, PLR0912
     n_initial_start_points: int | None = 256,
     acquisition_func_type: Literal["EI", "IT-JES", "IT-MES", "IT-SCAN-JES"] = "EI",
     constraints_func: Callable[[Mapping[str, Any]], float] | None = None,
+    log_y: bool = True,
+    budget_schedule: Literal[
+        "none", "space_expansion", "left_budget_contraction"
+    ] = "none",
+    target_flops: float | None = None,
 ) -> BayesianOptimization:
     """Initialise the BO loop.
 
@@ -117,6 +122,12 @@ def _bo(  # noqa: C901, PLR0912
         num_restarts: Number of restarts used when optimizing the acquisition function.
         n_initial_start_points: Number of initial start points used when optimizing the
             acquisition function. If `None`, a dimension-dependent heuristic is used.
+        log_y: Whether the GP with the power law prior mean in the cost models the log
+            of the objective.
+        budget_schedule: How the max cost of a sampled config follows the spent cost
+            budget, see `BayesianOptimization.budget_schedule`.
+        target_flops: The FLOPs the `"IT-SCAN-JES"` acquisition samples the optima
+            around, which it needs.
 
     Raises:
         ValueError: if initial_design_size < 1
@@ -179,6 +190,9 @@ def _bo(  # noqa: C901, PLR0912
         n_initial_start_points=n_initial_start_points,
         constraints_func=constraints_func,
         acquisition_func_type=acquisition_func_type,
+        log_y=log_y,
+        budget_schedule=budget_schedule,
+        target_flops=target_flops,
     )
 
 
@@ -1373,6 +1387,13 @@ def bayesian_optimization(
     num_restarts: int = 20,
     n_initial_start_points: int | None = 256,
     constraints_func: Callable[[Mapping[str, Any]], float] | None = None,
+    acquisition_func_type: Literal["EI", "IT-JES", "IT-MES", "IT-SCAN-JES"] = "EI",
+    log_y: bool = True,
+    budget_schedule: Literal[
+        "none", "space_expansion", "left_budget_contraction"
+    ] = "none",
+    target_flops: float | None = None,
+    sample_prior_first: bool = False,
 ) -> BayesianOptimization:
     """Models the relation between hyperparameters in your `pipeline_space`
     and the results of `evaluate_pipeline` using bayesian optimization.
@@ -1431,6 +1452,16 @@ def bayesian_optimization(
         constraints_func: A function that takes a configuration and returns a float
             indicating how much the configuration violates the constraints. A
             non-negative value means the configuration is valid.
+        acquisition_func_type: The acquisition function of single objective
+            optimization.
+        log_y: Whether the GP with the power law prior mean in the cost models the log
+            of the objective.
+        budget_schedule: How the max cost of a sampled config follows the spent cost
+            budget, see `BayesianOptimization.budget_schedule`. Needs a
+            `cost_estimator` and a cost budget given to `extrapolaw.acquire()`.
+        sample_prior_first: Whether the first config is the center of the space.
+        target_flops: The FLOPs the `"IT-SCAN-JES"` acquisition samples the optima
+            around, which it needs.
     """
     if isinstance(pipeline_space, PipelineSpace):
         converted_space = convert_extrapolaw_to_classic_search_space(pipeline_space)
@@ -1473,12 +1504,16 @@ def bayesian_optimization(
         cost_aware=cost_aware,
         device=device,
         use_priors=False,
-        sample_prior_first=False,
+        sample_prior_first=sample_prior_first,
         ignore_fidelity=ignore_fidelity,
         reference_point=reference_point,
         num_restarts=num_restarts,
         n_initial_start_points=n_initial_start_points,
         constraints_func=constraints_func,
+        acquisition_func_type=acquisition_func_type,
+        log_y=log_y,
+        budget_schedule=budget_schedule,
+        target_flops=target_flops,
     )
 
 

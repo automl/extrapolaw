@@ -261,3 +261,21 @@ def test_predict_gp_posterior_from_a_run(tmp_path: Path) -> None:
     assert prediction.config is not None
     # One GP answers every target
     assert prediction.config["n_params"] == pytest.approx(prediction.n_params)
+
+
+def test_gp_posterior_checkpoint_only_loads_with_the_same_log_y(
+    tmp_path: Path,
+) -> None:
+    rows = _synthetic(n=12)
+    gp.fit(
+        space=SPACE,
+        configs=_configs(rows),
+        losses=[r[2] for r in rows],
+        cost_estimator=_flops,
+        cache_dir=tmp_path,
+        seed=1,
+    )
+    path = gp.gp_cache_path(tmp_path, 12)
+    kwargs = {"space": SPACE, "cost_estimator": _flops}
+    assert gp._load_gp_fit(path, 12, **kwargs) is not None
+    assert gp._load_gp_fit(path, 12, log_y=False, **kwargs) is None

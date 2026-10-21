@@ -9,6 +9,8 @@ from torch import Tensor
 if TYPE_CHECKING:
     from botorch.models.gpytorch import GPyTorchModel
 
+    from extrapolaw.optimizers.models.gp import LogCost
+
 
 class CostWeightedModifiedJES(AcquisitionFunction):
     """Modified JES with normalized log-cost weighting (GIBBON-style).
@@ -19,6 +21,9 @@ class CostWeightedModifiedJES(AcquisitionFunction):
 
     c_norm(λ) = (log C(λ) - log C_min) / (log C_max - log C_min) + ε
 
+    with `log C` the exact `log10` cost of `log_cost` and fixed bounds `C_min`,
+    `C_max`, so the weighting does not move with the costs observed so far.
+
     Fantasy optima (λ*_s, y*_s) are sampled at C_target by restricting
     get_optimal_samples to candidates near C_target before instantiation.
     """
@@ -28,15 +33,27 @@ class CostWeightedModifiedJES(AcquisitionFunction):
         model: GPyTorchModel,
         optimal_inputs: Tensor,
         optimal_outputs: Tensor,
-        cost_model: GPyTorchModel | None,
+        log_cost: LogCost | None,
         c_min_log: float,
         c_max_log: float,
         epsilon: float = 1e-4,
     ) -> None:
+        """Initialize the acquisition.
+
+        Args:
+            model: The GP of the objective.
+            optimal_inputs: The sampled optima `(S, D)`.
+            optimal_outputs: Their sampled values `(S, 1)`.
+            log_cost: The `log10` cost of encoded configs, `None` for no cost
+                weighting.
+            c_min_log: The `log10` of the smallest cost, `C_min`.
+            c_max_log: The `log10` of the largest cost, `C_max`.
+            epsilon: Lower bound of `c_norm`.
+        """
         super().__init__(model=model)  # type: ignore[arg-type]
         self.optimal_inputs = optimal_inputs
         self.optimal_outputs = optimal_outputs
-        self.cost_model = cost_model
+        self.log_cost = log_cost
         self.c_min_log = c_min_log
         self.c_max_log = c_max_log
         self.epsilon = epsilon
@@ -74,15 +91,16 @@ class CostWeightedModifiedJES(AcquisitionFunction):
         ig = ig.mean(dim=-2).squeeze(-1).clamp(min=0.0)  # (batch,)
 
         # Normalized log-cost weighting
-        if self.cost_model is None or abs(self.c_max_log - self.c_min_log) < 1e-8:
+        if self.log_cost is None or abs(self.c_max_log - self.c_min_log) < 1e-8:
             return ig
 
-        with torch.no_grad():
-            pred_log_c: Tensor = self.cost_model.posterior(X[..., :1, :]).mean  # type: ignore[union-attr]
-        pred_log_c = pred_log_c.squeeze(-1).squeeze(-1)  # (batch,)
+        # Without gradient, the cost is a black box of the config
+        x_first = X[..., 0, :]  # (batch, D)
+        log_c = self.log_cost.evaluate(x_first.reshape(-1, x_first.shape[-1]))
+        log_c = log_c.view(x_first.shape[:-1])  # (batch,)
 
-        c_norm = (
-            (pred_log_c - self.c_min_log) / (self.c_max_log - self.c_min_log)
-        ).clamp(min=self.epsilon)
+        c_norm = ((log_c - self.c_min_log) / (self.c_max_log - self.c_min_log)).clamp(
+            min=self.epsilon
+        )
 
         return ig / c_norm

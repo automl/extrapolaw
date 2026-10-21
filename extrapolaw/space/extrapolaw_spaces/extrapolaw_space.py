@@ -1192,6 +1192,7 @@ def convert_extrapolaw_to_classic_search_space(
                         prior_confidence=(
                             value.prior_confidence.value if value.has_prior else "low"
                         ),
+                        is_compute_scaling=value._is_compute_scaling,
                     )
                 elif isinstance(value, Fidelity):
                     if isinstance(value.domain, Integer):

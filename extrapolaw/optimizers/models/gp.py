@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import logging
+import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
@@ -79,29 +81,110 @@ def default_categorical_kernel(
     )
 
 
-class PowerLawMean(GpMean):
-    """A fixed power law in the cost as the GP prior mean.
+class LogCost:
+    """The `log10` cost of encoded configurations, clamped to `1e-10 * reference_cost`.
 
-    `loss = 10 ** (slope * log10(cost) + bias)`, the log-log fit of
-    `fit_power_law_mean_params()`, with the cost of an encoded configuration given by
-    `cost_estimator`. The GP models the outcomes standardized by `Standardize`, so the
-    mean is `(loss - y_mean) / y_std` with the statistics of the training outcomes.
-    Costs are clamped to `1e-10 * reference_cost` before the log.
+    Call it on an encoded tensor of shape `(..., d)` for the costs of shape `(...)`,
+    differentiable through finite differences. The costs are memoized per encoded row, as
+    fitting the GP evaluates the training rows over and over.
     """
 
     def __init__(
         self,
         encoder: ConfigEncoder,
         cost_estimator: Callable[..., float],
+        *,
+        reference_cost: float = 1e16,
+    ) -> None:
+        self.encoder = encoder
+        self.cost_estimator = cost_estimator
+        self._memo: dict[bytes, float] = {}
+
+    def of_config(self, config: Mapping[str, Any]) -> float:
+        """The `log10` cost of a single decoded configuration."""
+        return math.log10(float(self.cost_estimator(**config)))
+
+    def evaluate(self, x: torch.Tensor) -> torch.Tensor:
+        """The `log10` costs of the rows of `x` of shape `(n, d)`, without gradient."""
+        rows = x.detach().cpu()
+        keys = [row.numpy().tobytes() for row in rows]
+        missing = [i for i, key in enumerate(keys) if key not in self._memo]
+        if missing:
+            configs = self.encoder.decode(rows[missing])
+            for i, config in zip(missing, configs, strict=True):
+                self._memo[keys[i]] = self.of_config(config)
+        return torch.tensor(
+            [self._memo[key] for key in keys], dtype=x.dtype, device=x.device
+        )
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        return _LogCostFn.apply(x, self)
+
+
+class _LogCostFn(torch.autograd.Function):
+    """`LogCost` as a differentiable function of the encoded tensor, using finite
+    differences for the gradient like `BlackBoxConstraintFn`.
+    """
+
+    @staticmethod
+    def forward(ctx, x, log_cost):  # type: ignore
+        x_flat = x.detach().reshape(-1, x.shape[-1])
+        vals = log_cost.evaluate(x_flat)
+        ctx.log_cost = log_cost
+        ctx.save_for_backward(x)
+        return vals.view(x.shape[:-1])
+
+    @staticmethod
+    def backward(ctx, grad_output):  # type: ignore
+        (x,) = ctx.saved_tensors
+        log_cost: LogCost = ctx.log_cost
+        x_flat = x.detach().reshape(-1, x.shape[-1])
+        grad_out_flat = grad_output.reshape(-1)
+        grad_in_flat = torch.zeros_like(x_flat)
+        base_vals = log_cost.evaluate(x_flat)
+        configs = log_cost.encoder.decode(x_flat.cpu())
+
+        for i in range(len(x_flat)):
+            # Skip points that don't contribute
+            if grad_out_flat[i] == 0:
+                continue
+
+            for d in range(x_flat.shape[-1]):
+                step = _finite_difference_step(x_flat[i], d, configs[i], log_cost.encoder)
+                if step is None:
+                    continue
+
+                config_p, h = step
+                val_p = log_cost.of_config(config_p)
+                grad_in_flat[i, d] = (val_p - base_vals[i]) / h * grad_out_flat[i]
+
+        return grad_in_flat.view_as(x), None
+
+
+class PowerLawMean(GpMean):
+    """A fixed power law in the cost as the GP prior mean.
+
+    `loss = 10 ** (slope * log10(cost) + bias)`, the log-log fit of
+    `fit_power_law_mean_params()`, with the `log10(cost)` of an encoded configuration
+    given by `log_cost`. With `log_y`, the GP models `log(loss)`, so the mean is the line
+    `ln(10) * (slope * log10(cost) + bias)`. The GP models its outcomes transformed by
+    `y_transform`, the fitted outcome transform of the GP in eval mode, and so is the
+    mean.
+    """
+
+    def __init__(
+        self,
+        log_cost: LogCost,
         slope: float,
         bias: float,
         reference_cost: float = 1e16,
-        y_mean: float = 0.0,
-        y_std: float = 1.0,
+        *,
+        y_transform: OutcomeTransform | None = None,
+        log_y: bool = False,
     ) -> None:
         super().__init__()
-        self.encoder = encoder
-        self.cost_estimator = cost_estimator
+        self.log_cost = log_cost
+        self.log_y = log_y
         # Buffers, not parameters: the power law is fixed, not learned with the GP. The
         # names match the GP checkpoints written with NePS, so those still load
         self.register_buffer("fixed_slope", torch.tensor(slope, dtype=torch.float64))
@@ -109,27 +192,18 @@ class PowerLawMean(GpMean):
         self.register_buffer(
             "reference_flops", torch.tensor(reference_cost, dtype=torch.float64)
         )
-        # Not persistent, as they follow from the training outcomes the GP is built
-        # with, and the checkpoints written with NePS don't have them
-        self.register_buffer(
-            "y_mean", torch.tensor(y_mean, dtype=torch.float64), persistent=False
-        )
-        self.register_buffer(
-            "y_std", torch.tensor(y_std, dtype=torch.float64), persistent=False
-        )
+        # Not a submodule, as it follows from the training outcomes the GP is built
+        # with, and the checkpoints written with NePS don't have it
+        object.__setattr__(self, "y_transform", y_transform)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        batch_shape = x.shape[:-1]
-        with torch.no_grad():
-            configs = self.encoder.decode(x.reshape(-1, x.shape[-1]))
-            costs = torch.tensor(
-                [self.cost_estimator(**config) for config in configs],
-                dtype=x.dtype,
-                device=x.device,
-            )
-        log10_cost = torch.log10(costs.clamp(min=1e-10 * self.reference_flops))
-        loss = 10 ** (self.fixed_slope * log10_cost + self.fixed_bias)
-        return ((loss - self.y_mean) / self.y_std).view(batch_shape)
+        log10_cost = self.log_cost(x)
+        log10_loss = self.fixed_slope * log10_cost + self.fixed_bias
+        mean = math.log(10) * log10_loss if self.log_y else 10**log10_loss
+        if self.y_transform is None:
+            return mean
+        transformed, _ = self.y_transform(mean.unsqueeze(-1))
+        return transformed.squeeze(-1)
 
 
 def make_default_single_obj_gp(
@@ -142,15 +216,26 @@ def make_default_single_obj_gp(
     min_cost: float = 1e16,
     mean_slope: float = -0.5,
     mean_bias: float = 5.0,
+    log_y: bool = False,
 ) -> SingleTaskGP:
     """Default GP for single objective optimization.
 
     With a `cost_estimator`, the prior mean is the power law `loss = 10 ** (mean_slope *
-    log10(cost) + mean_bias)`, standardized like the outcomes by the default
-    `Standardize`, see `PowerLawMean`. It is not used for purely categorical spaces.
+    log10(cost) + mean_bias)`, transformed like the outcomes, see `PowerLawMean`. It is
+    not used for purely categorical spaces.
+
+    With `log_y`, the GP models `log(y)`, when all `y` are positive, and the caller has
+    to exponentiate its predictions back. The returned GP has `log_y` set to whether it
+    does.
     """
     if y.ndim == 1:
         y = y.unsqueeze(-1)
+
+    if log_y and not bool((y > 0).all()):
+        logger.warning("Not all outcomes are positive, the GP models them without log.")
+        log_y = False
+    if log_y:
+        y = y.log()
 
     if y_transform is None:
         y_transform = Standardize(m=1)
@@ -163,33 +248,26 @@ def make_default_single_obj_gp(
         else:
             numerics.append(encoder.index_of[hp_name])
 
-    mean_module = None
-    if cost_estimator is not None:
-        # The statistics `Standardize` computes for the outcomes the GP models
-        y_std = y.std().item() if len(y) > 1 else 1.0
-        mean_module = PowerLawMean(
-            encoder=encoder,
-            cost_estimator=cost_estimator,
-            slope=mean_slope,
-            bias=mean_bias,
-            reference_cost=min_cost,
-            y_mean=y.mean().item(),
-            y_std=y_std if y_std >= 1e-8 else 1.0,
-        )
-
-    # Purely vectorial
-    if len(categoricals) == 0:
-        return SingleTaskGP(
-            train_X=x, train_Y=y, outcome_transform=y_transform, mean_module=mean_module
-        )
+    log_cost = None
+    if cost_estimator is not None and len(numerics) > 0:
+        log_cost = LogCost(encoder, cost_estimator, reference_cost=min_cost)
 
     # Purely categorical
     if len(numerics) == 0:
-        return SingleTaskGP(
+        gp = SingleTaskGP(
             train_X=x,
             train_Y=y,
             covar_module=default_categorical_kernel(len(categoricals)),
             outcome_transform=y_transform,
+        )
+        gp.log_y = log_y
+        return gp
+
+    # Purely vectorial
+    if len(categoricals) == 0:
+        gp = SingleTaskGP(train_X=x, train_Y=y, outcome_transform=y_transform)
+        return _with_power_law_mean(
+            gp, log_cost, log_y=log_y, slope=mean_slope, bias=mean_bias, min_cost=min_cost
         )
 
     # Mixed
@@ -214,13 +292,43 @@ def make_default_single_obj_gp(
     # TODO: Figure out how to improve stability of this.
     kernel = numeric_kernel + cat_kernel
 
-    return SingleTaskGP(
+    gp = SingleTaskGP(
         train_X=x,
         train_Y=y,
         covar_module=kernel,
         outcome_transform=y_transform,
-        mean_module=mean_module,
     )
+    return _with_power_law_mean(
+        gp, log_cost, log_y=log_y, slope=mean_slope, bias=mean_bias, min_cost=min_cost
+    )
+
+
+def _with_power_law_mean(
+    gp: SingleTaskGP,
+    log_cost: LogCost | None,
+    *,
+    log_y: bool,
+    slope: float,
+    bias: float,
+    min_cost: float,
+) -> SingleTaskGP:
+    """Set the `PowerLawMean` of `gp` when there is a `log_cost`, and `gp.log_y`."""
+    gp.log_y = log_y
+    if log_cost is None:
+        return gp
+
+    # A frozen copy of the outcome transform `SingleTaskGP` fitted on the outcomes, as
+    # the transform itself refits while the GP is in train mode
+    y_transform = copy.deepcopy(gp.outcome_transform).eval()
+    gp.mean_module = PowerLawMean(
+        log_cost,
+        slope=slope,
+        bias=bias,
+        reference_cost=min_cost,
+        y_transform=y_transform,
+        log_y=log_y,
+    )
+    return gp
 
 
 def optimize_acq(  # noqa: C901, PLR0912, PLR0915

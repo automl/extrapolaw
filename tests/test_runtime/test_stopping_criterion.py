@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pytest_cases import fixture
 
+from extrapolaw.exceptions import BudgetExhaustedError
 from extrapolaw.optimizers.algorithms import asha, random_search
 from extrapolaw.optimizers.optimizer import OptimizerInfo
 from extrapolaw.runtime import DefaultWorker
@@ -743,3 +744,46 @@ def test_fidelity_to_spend(extrapolaw_state: ExtrapolawState) -> None:
         extrapolaw_state.lock_and_get_next_pending_trial() is None
     )  # should have no pending trials to be picked up
     assert len(extrapolaw_state.lock_and_get_errors()) == 0
+
+
+def test_budget_exhausted_optimizer_stops_the_worker_without_retrying(
+    extrapolaw_state: ExtrapolawState,
+) -> None:
+    class TestSpace(PipelineSpace):
+        a = Float(0, 1)
+
+    sample = random_search(pipeline_space=TestSpace())
+    calls = 0
+
+    def optimizer(trials, budget_info, n=None):
+        nonlocal calls
+        calls += 1
+        if calls > 2:
+            raise BudgetExhaustedError("No budget left")
+        return sample(trials, budget_info, n=n)
+
+    settings = WorkerSettings(
+        on_error=OnErrorPossibilities.IGNORE,
+        default_report_values=DefaultReportValues(),
+        worker_evaluations_to_spend=None,
+        include_in_progress_evaluations_towards_maximum=False,
+        worker_cost_to_spend=None,
+        worker_fidelities_to_spend=None,
+        max_evaluation_time_total_seconds=None,
+        max_wallclock_time_seconds=None,
+        batch_size=None,
+    )
+
+    def eval_function(*args, **kwargs) -> float:
+        return 1.0
+
+    worker = DefaultWorker.new(
+        state=extrapolaw_state,
+        optimizer=optimizer,
+        evaluation_fn=eval_function,
+        settings=settings,
+    )
+    worker.run()
+
+    assert calls == 3
+    assert len(extrapolaw_state.lock_and_read_trials()) == 2

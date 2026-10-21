@@ -76,3 +76,9 @@ class ConstraintViolationError(
     ExtrapolawError
 ):  # TODO: add constraint information to the error message
     """Raised when a configuration violates the constraints of the search space."""
+
+
+class BudgetExhaustedError(ExtrapolawError):
+    """Raised by an optimizer when the cost budget left is too small to sample a useful
+    configuration. The worker stops right away instead of retrying to sample.
+    """

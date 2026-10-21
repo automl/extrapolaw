@@ -579,7 +579,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
         _eval = _with_estimated_cost(_eval, _cost_estimator)
     if isinstance(space, PipelineSpace):
         pass
-        # _eval = adjust_evaluation_pipeline_for_autoscan_space(_eval, space)  # TODO
+        # _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)  # TODO
 
     _launch_runtime(
         evaluation_fn=_eval,  # type: ignore

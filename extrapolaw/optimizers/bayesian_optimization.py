@@ -19,7 +19,9 @@ from botorch.acquisition.multi_objective.logei import (
 from botorch.models.transforms.outcome import Standardize
 from botorch.utils.sampling import draw_sobol_samples
 
+from extrapolaw.exceptions import BudgetExhaustedError, ConstraintViolationError
 from extrapolaw.optimizers.models.gp import (
+    LogCost,
     encode_constraints_func,
     encode_trials_for_gp,
     fit_and_acquire_from_gp,
@@ -130,12 +132,138 @@ class BayesianOptimization(ScalingOptimizer):
     cost_estimator: CostEstimator | None = None
     target_flops: int | None = None
 
-    def get_constraint_func(self) -> Callable[[Mapping[str, Any]], float] | None:
+    log_y: bool = True
+    """Whether the GP with the power law prior mean in the cost models the log of the
+    objective."""
+
+    budget_schedule: Literal["none", "space_expansion", "left_budget_contraction"] = (
+        "none"
+    )
+    """How the max cost of a sampled config follows the spent cost budget.
+
+    * `"none"`: only `max_cost_per_config` caps it.
+    * `"space_expansion"`: a ladder of caps. The initial design gets `B / 2^L` of the
+      budget `B`, split evenly over its configs, and level `i` then allows configs up to
+      `B / 2^(L - i)`, with `L = ceil(log2(B / max_cost_per_config))`. A level whose
+      cap leaves no feasible config is skipped.
+    * `"left_budget_contraction"`: the initial design configs cost up to
+      `B / (10 * n_initial_design)`, later ones up to the budget left.
+
+    Both schedules need a `cost_estimator` and a cost budget given to
+    `extrapolaw.acquire()`, and are clamped at `max_cost_per_config` and the budget left.
+    Once the budget left is below the cap of the initial design configs, the cheapest
+    the schedule samples, or no feasible config fits in it, sampling raises
+    `BudgetExhaustedError` and the worker stops.
+    """
+
+    def get_constraint_func(
+        self, max_cost: float | None = None
+    ) -> Callable[[Mapping[str, Any]], float] | None:
+        """The constraint of the sampled configs, with `max_cost` the cap of this round
+        of the `budget_schedule`.
+        """
         assert not isinstance(self.space, PipelineSpace)  # Converted in __post_init__
+        constraints_func = self.constraints_func
+        if max_cost is not None:
+            assert self.cost_estimator is not None
+            estimator, user_constraint = self.cost_estimator, self.constraints_func
+
+            def constraints_func(config: Mapping[str, Any]) -> float:
+                # Normalized like `budget_constraint()`, `config` has the constants
+                slack = 1.0 - estimator(**config) / max_cost
+                if user_constraint is None:
+                    return slack
+                return min(slack, user_constraint(config))
+
         # The GP only ever sees the searchables, the cost estimator needs the constants
-        return self.budget_constraint(
-            self.constraints_func, constants=self.space.constants
-        )
+        return self.budget_constraint(constraints_func, constants=self.space.constants)
+
+    def _total_budget(self, budget_info: BudgetInfo | None) -> float:
+        budget = None
+        if budget_info is not None:
+            budget = budget_info.total_cost_to_spend
+            if budget is None:
+                budget = budget_info.worker_cost_to_spend
+        if budget is None:
+            raise ValueError(
+                f"The {self.budget_schedule!r} budget schedule needs a cost budget,"
+                " pass `total_cost_to_spend` or `worker_cost_to_spend` to"
+                " `extrapolaw.acquire()`."
+            )
+        return budget
+
+    def _schedule_bounds(self, total: float) -> tuple[int, float]:
+        """The number of levels `L` of the space expansion and the budget of its
+        initial design.
+        """
+        top = self.max_cost_per_config or self.target_flops
+        if top is None:
+            raise ValueError(
+                "The 'space_expansion' budget schedule needs `max_cost_per_config` to be"
+                " given to `extrapolaw.acquire()`."
+            )
+        max_expansion = 1 if total <= top else max(1, math.ceil(math.log2(total / top)))
+        return max_expansion, total / 2**max_expansion
+
+    def _expansion_level(self, spent: float, total: float) -> int:
+        """The level of the space expansion after spending `spent` of `total`.
+
+        Level 0 is the initial design, level `i >= 1` has a budget of
+        `total / 2^(L - i)`.
+        """
+        max_expansion, initial_budget = self._schedule_bounds(total)
+        if spent < initial_budget:
+            return 0
+
+        spent_in_expansion = spent - initial_budget
+        for level in range(1, max_expansion + 1):
+            budget_for_level = total / 2 ** (max_expansion - level)
+            if spent_in_expansion < budget_for_level:
+                return level
+            spent_in_expansion -= budget_for_level
+        return max_expansion
+
+    def _schedule_cap(
+        self,
+        spent: float,
+        total: float,
+        *,
+        is_initial_design: bool,
+        expand: int = 0,
+    ) -> float:
+        """The max cost of a config sampled this round, `expand` levels above the
+        current one of the space expansion.
+        """
+        if self.budget_schedule == "left_budget_contraction":
+            if is_initial_design:
+                cap = total / (10 * self.n_initial_design)
+            else:
+                cap = total - spent
+        else:
+            max_expansion, initial_budget = self._schedule_bounds(total)
+            level = self._expansion_level(spent, total) + expand
+            if level == 0 and spent < initial_budget:
+                cap = (
+                    initial_budget / self.n_initial_design
+                    if is_initial_design
+                    else initial_budget - spent
+                )
+            else:
+                cap = total / 2 ** (max_expansion - level)
+        if self.max_cost_per_config is not None:
+            cap = min(cap, self.max_cost_per_config)
+        return min(cap, total - spent)
+
+    def _min_schedule_cap(self, total: float) -> float:
+        """The cap of the initial design configs, the cheapest of the schedule."""
+        if self.budget_schedule == "left_budget_contraction":
+            cap = total / (10 * self.n_initial_design)
+        else:
+            _, initial_budget = self._schedule_bounds(total)
+            cap = initial_budget / self.n_initial_design
+        if self.max_cost_per_config is not None:
+            cap = min(cap, self.max_cost_per_config)
+        return cap
 
     def _cost_estimator_with_constants(self) -> Callable[..., float] | None:
         if self.cost_estimator is None:
@@ -276,12 +404,83 @@ class BayesianOptimization(ScalingOptimizer):
             logger.error(f"Failed to generate extrapolation landscape: {e}")
             return None
 
-    def sample_candidates(  # noqa: C901, PLR0912, PLR0915  # noqa: C901, PLR0912
+    def sample_candidates(
         self,
         trials: Mapping[str, Trial],
         budget_info: BudgetInfo | None = None,
         n: int | None = None,
     ) -> SampledConfig | list[SampledConfig]:
+        if self.budget_schedule == "none":
+            return self._sample_candidates(trials, budget_info, n)
+
+        if self.cost_estimator is None:
+            raise ValueError(
+                f"The {self.budget_schedule!r} budget schedule needs a `cost_estimator`"
+                " to be given to `extrapolaw.acquire()`."
+            )
+        total = self._total_budget(budget_info)
+        # Pending trials count too, so parallel workers see each other's spend
+        spent = sum(self.cost_estimator(**trial.config) for trial in trials.values())
+        is_initial_design = len(trials) < self.n_initial_design
+        cost_bounds = (
+            self._min_schedule_cap(total),
+            self.target_flops or self.max_cost_per_config or total,
+        )
+
+        left = total - spent
+        if left < cost_bounds[0]:
+            raise BudgetExhaustedError(
+                f"Only {left:e} of the cost budget {total:e} is left, less than the"
+                f" {cost_bounds[0]:e} of the cheapest config the schedule samples."
+            )
+
+        max_cost = self._schedule_cap(spent, total, is_initial_design=is_initial_design)
+        logger.info(
+            f"Budget schedule {self.budget_schedule!r}: max cost {max_cost:e} per"
+            f" config, spent {spent:e} of {total:e}."
+        )
+        try:
+            return self._sample_candidates(
+                trials, budget_info, n, max_cost=max_cost, cost_bounds=cost_bounds
+            )
+        except ConstraintViolationError as e:
+            error = e
+
+        # A level without feasible configs moves on to the next one, unless the next
+        # one allows no more, as the budget left or `max_cost_per_config` limit it
+        next_cost = self._schedule_cap(spent, total, is_initial_design=False, expand=1)
+        if self.budget_schedule == "space_expansion" and next_cost > max_cost:
+            logger.warning(
+                f"No feasible config under the max cost of this level ({error}),"
+                f" retrying with the next level's {next_cost:e}."
+            )
+            try:
+                return self._sample_candidates(
+                    trials, budget_info, n, max_cost=next_cost, cost_bounds=cost_bounds
+                )
+            except ConstraintViolationError as e:
+                error, max_cost = e, next_cost
+
+        if max_cost >= left:
+            raise BudgetExhaustedError(
+                f"No feasible config costs at most the {left:e} of the cost budget"
+                f" {total:e} left."
+            ) from error
+        raise error
+
+    def _sample_candidates(  # noqa: C901, PLR0912, PLR0915
+        self,
+        trials: Mapping[str, Trial],
+        budget_info: BudgetInfo | None = None,
+        n: int | None = None,
+        *,
+        max_cost: float | None = None,
+        cost_bounds: tuple[float, float] | None = None,
+    ) -> SampledConfig | list[SampledConfig]:
+        """Sample the configs with a cost up to `max_cost`, and `cost_bounds` the
+        smallest and largest cost the schedule samples, to normalize the cost term of the
+        acquisition with.
+        """
         assert not isinstance(self.space, PipelineSpace)  # Converted in __post_init__
         # If fidelities exist, sample from them as normal
         # This is a bit of a hack, as we set them to max fidelity
@@ -294,7 +493,7 @@ class BayesianOptimization(ScalingOptimizer):
         list(parameters.keys())
 
         n_to_sample = 1 if n is None else n
-        constraints_func = self.get_constraint_func()
+        constraints_func = self.get_constraint_func(max_cost)
 
         # Sampled configs are always run at the max fidelity, so that is also what
         # the constraint has to be checked against.
@@ -521,6 +720,7 @@ class BayesianOptimization(ScalingOptimizer):
                     min_cost=mean_params.min_flops,
                     mean_slope=mean_params.slope,
                     mean_bias=mean_params.intercept,
+                    log_y=self.log_y,
                 )
             from botorch.fit import fit_gpytorch_mll
             from gpytorch import ExactMarginalLogLikelihood
@@ -612,16 +812,8 @@ class BayesianOptimization(ScalingOptimizer):
                     maximize=False,
                 )
             elif self.acquisition_func_type == "IT-SCAN-JES":
-                import math
-
-                from botorch.fit import fit_gpytorch_mll as _fit_mll
-                from gpytorch import ExactMarginalLogLikelihood as _ExactMLL
-
                 from extrapolaw.optimizers.acquisition.information_theoretic import (
                     CostWeightedModifiedJES,
-                )
-                from extrapolaw.optimizers.models.gp import (
-                    make_default_single_obj_gp as _make_gp,
                 )
 
                 lower = [domain.lower for domain in encoder.domains]
@@ -640,27 +832,34 @@ class BayesianOptimization(ScalingOptimizer):
                     raw_candidates, encoded_constraints_func
                 )
                 target_flops = self.target_flops
-                assert target_flops is not None
+                if target_flops is None:
+                    raise ValueError(
+                        "The 'IT-SCAN-JES' acquisition needs `target_flops`, the FLOPs"
+                        " it samples the optima around."
+                    )
                 assert cost_estimator is not None
-                flop_vals: list[float] = []
-                for cand in raw_candidates:
-                    try:
-                        conf = encoder.decode(cand.unsqueeze(0))[0]
-                        flop_vals.append(float(cost_estimator(**conf)))
-                    except Exception:  # noqa: BLE001
-                        flop_vals.append(0.0)  # to keep dim consistent
-                log_flops = (
-                    torch.tensor(flop_vals, dtype=torch.float64, device=data.x.device)
-                    .clamp(min=1)
-                    .log()
-                )
-                log_target = math.log(target_flops)
-                mask = (log_flops - log_target).abs() < math.log(
-                    1.5
-                )  # a bound of 2/3 to 1.5x the target FLOPs
-                candidate_set = (
-                    raw_candidates[mask] if mask.sum() >= 4 else raw_candidates
-                )
+                log_cost = LogCost(encoder, cost_estimator, reference_cost=target_flops)
+                log10_target = math.log10(target_flops)
+                distance = (log_cost.evaluate(raw_candidates) - log10_target).abs()
+                # Widen the window around the target FLOPs until it holds enough
+                # candidates, starting at 2/3 to 1.5x the target
+                for factor in (1.5, 3.0, 10.0):
+                    in_window = distance < math.log10(factor)
+                    if in_window.sum() >= 4:
+                        if factor > 1.5:
+                            logger.warning(
+                                "Too few candidates cost within 1.5x of the target"
+                                f" FLOPs {target_flops:e}, sampling the optima over"
+                                f" those within {factor}x."
+                            )
+                        break
+                else:
+                    logger.warning(
+                        "No window around the target FLOPs holds enough candidates,"
+                        " sampling the optima over all feasible candidates."
+                    )
+                    in_window = torch.ones_like(in_window)
+                candidate_set = raw_candidates[in_window]
 
                 # Sample S posterior paths over the C_target-filtered candidate set
                 # and take the argmin of each path to get fantasy optima at C_target.
@@ -674,27 +873,17 @@ class BayesianOptimization(ScalingOptimizer):
                 ):
                     raise ValueError("NaN in modified-JES optimal samples")
 
-                # Build cost GP trained on log-FLOPs for the normalized cost term.
-                cost_gp = None
-                c_min_log = math.log(1e10)
-                c_max_log = math.log(1e19)
-                if data.cost is not None and data.cost.numel() >= 2:
-                    costs_log = data.cost.clamp(min=1).log()
-                    c_min_log = costs_log.min().item()
-                    c_max_log = costs_log.max().item()
-                    if c_max_log > c_min_log:
-                        cost_gp = _make_gp(
-                            x=data.x, y=costs_log.unsqueeze(-1), encoder=encoder
-                        )
-                        _fit_mll(_ExactMLL(likelihood=cost_gp.likelihood, model=cost_gp))
-
+                # Fixed bounds for the normalized cost term, so it doesn't move with
+                # the costs observed so far
+                if cost_bounds is None:
+                    cost_bounds = (mean_params.min_flops, target_flops)
                 acquisition = CostWeightedModifiedJES(
                     model=gp,
                     optimal_inputs=optimal_inputs,
                     optimal_outputs=optimal_outputs,
-                    cost_model=cost_gp,
-                    c_min_log=c_min_log,
-                    c_max_log=c_max_log,
+                    log_cost=log_cost,
+                    c_min_log=math.log10(cost_bounds[0]),
+                    c_max_log=math.log10(cost_bounds[1]),
                 )
             else:
                 raise NotImplementedError(

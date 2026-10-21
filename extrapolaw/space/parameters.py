@@ -55,6 +55,9 @@ class HPOFloat:
     is_fidelity: bool = False
     """Whether the hyperparameter is fidelity."""
 
+    is_compute_scaling: bool = False
+    """Whether the hyperparameter scales the compute cost, e.g. the amount of data."""
+
     domain: Domain[float] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:  # noqa: C901

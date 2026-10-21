@@ -31,9 +31,15 @@ class GPPosteriorPredictionInfo:
     constrained: bool  # True if a cost-feasible candidate was found
 
 
+#: Version of the GP model, checkpoints of other versions are refit. Version 2 can
+#: model `log(loss)`.
+GP_FIT_VERSION = 2
+
+
 def gp_cache_path(cache_dir: Path, n_trials: int) -> Path:
     """Checkpoint path of the GP fit on the first `n_trials` trials."""
-    return cache_dir / f"fit_gp_n{n_trials}.pt"
+    # Versioned, so neither the fits nor the prediction memos of others are reused
+    return cache_dir / f"fit_gp_v{GP_FIT_VERSION}_n{n_trials}.pt"
 
 
 def gp_pred_cache_path(cache_path: Path) -> Path:
@@ -61,6 +67,9 @@ class GPPosteriorFit:
     mean_slope: float
     mean_bias: float
     min_flops: int
+    # Whether the GP models log(loss), its posterior mean is then exponentiated to the
+    # median of the predicted loss
+    log_y: bool = False
     # Sidecar file memoizing predict() results per target_flop (set by
     # fit_gp_posterior when a fit cache path is given). Predicting is the slow part
     # (Sobol pool + a Python cost_estimator loop), and is deterministic in
@@ -119,7 +128,7 @@ class GPPosteriorFit:
         self._save_pred_memo()
         return result
 
-    def _predict_uncached(
+    def _predict_uncached(  # noqa: C901
         self,
         target_flop: float,
         margin: float,
@@ -181,6 +190,8 @@ class GPPosteriorFit:
                 .mean.squeeze(-1)
                 .squeeze(-1)
             )
+        if self.log_y:
+            predicted_loss = predicted_loss.exp()
 
         lo = target_flop * (1.0 - margin)
 
@@ -218,12 +229,18 @@ class GPPosteriorFit:
         return best_config, best_output, info
 
 
+def _model_info(*, log_y: bool) -> dict[str, Any]:
+    """What a checkpoint stores of the GP model, to only load matching ones."""
+    return {"version": GP_FIT_VERSION, "log_y": log_y}
+
+
 def _train_gp(
     *,
     space: Any,
     configs: list[dict[str, Any]],
     losses: list[float],
     cost_estimator: Callable,
+    log_y: bool = True,
 ) -> GPPosteriorFit:
     """Train a GP on observed configs/losses. Independent of any target_flop."""
     import torch
@@ -265,6 +282,7 @@ def _train_gp(
         min_cost=mean_params.min_flops,
         mean_slope=mean_params.slope,
         mean_bias=mean_params.intercept,
+        log_y=log_y,
     )
     mll = ExactMarginalLogLikelihood(gp.likelihood, gp)
     fit_gpytorch_mll(mll)
@@ -281,10 +299,13 @@ def _train_gp(
         mean_slope=mean_params.slope,
         mean_bias=mean_params.intercept,
         min_flops=mean_params.min_flops,
+        log_y=gp.log_y,
     )
 
 
-def _save_gp_fit(path: Path, n_trials: int, fit: GPPosteriorFit) -> None:
+def _save_gp_fit(
+    path: Path, n_trials: int, fit: GPPosteriorFit, model_info: dict[str, Any]
+) -> None:
     import torch
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -298,6 +319,7 @@ def _save_gp_fit(path: Path, n_trials: int, fit: GPPosteriorFit) -> None:
                 "mean_slope": fit.mean_slope,
                 "mean_bias": fit.mean_bias,
                 "min_flops": fit.min_flops,
+                "model_info": model_info,
             },
             path,
         )
@@ -306,7 +328,12 @@ def _save_gp_fit(path: Path, n_trials: int, fit: GPPosteriorFit) -> None:
 
 
 def _load_gp_fit(
-    path: Path, n_trials: int, *, space: Any, cost_estimator: Callable
+    path: Path,
+    n_trials: int,
+    *,
+    space: Any,
+    cost_estimator: Callable,
+    log_y: bool = True,
 ) -> GPPosteriorFit | None:
     import torch
 
@@ -318,6 +345,8 @@ def _load_gp_fit(
     try:
         checkpoint = torch.load(path, weights_only=True)
         if int(checkpoint["n_trials"]) != n_trials:
+            return None
+        if checkpoint.get("model_info") != _model_info(log_y=log_y):
             return None
 
         encoder = ConfigEncoder.from_parameters(space.searchables)
@@ -331,6 +360,7 @@ def _load_gp_fit(
             min_cost=checkpoint["min_flops"],
             mean_slope=checkpoint["mean_slope"],
             mean_bias=checkpoint["mean_bias"],
+            log_y=log_y,
         )
         gp.load_state_dict(checkpoint["gp_state_dict"])
         gp.eval()
@@ -346,6 +376,7 @@ def _load_gp_fit(
             mean_slope=checkpoint["mean_slope"],
             mean_bias=checkpoint["mean_bias"],
             min_flops=checkpoint["min_flops"],
+            log_y=gp.log_y,
             pred_cache_path=gp_pred_cache_path(path),
         )
     except Exception:  # noqa: BLE001
@@ -361,8 +392,11 @@ def fit_gp_posterior(
     cache_path: Path | None = None,
     override: bool = False,
     seed: int | None = None,
+    log_y: bool = True,
 ) -> GPPosteriorFit:
     """Fit (or load from cache) a GP posterior over `configs`/`losses`.
+
+    `log_y` is handed to `make_default_single_obj_gp()`, see there.
 
     Caching, when `cache_path` is given, is keyed by `n_trials = len(configs)`
     only -- never by target_flop, since training doesn't depend on it. Call
@@ -378,19 +412,25 @@ def fit_gp_posterior(
 
     if cache_path is not None and not override:
         cached = _load_gp_fit(
-            cache_path, n_trials, space=space, cost_estimator=cost_estimator
+            cache_path, n_trials, space=space, cost_estimator=cost_estimator, log_y=log_y
         )
         if cached is not None:
             cached.seed = seed
             return cached
 
     fit = _train_gp(
-        space=space, configs=configs, losses=losses, cost_estimator=cost_estimator
+        space=space,
+        configs=configs,
+        losses=losses,
+        cost_estimator=cost_estimator,
+        log_y=log_y,
     )
 
     fit.seed = seed
     if cache_path is not None:
-        _save_gp_fit(cache_path, n_trials, fit)
+        _save_gp_fit(cache_path, n_trials, fit, _model_info(log_y=log_y))
+        # A memo of an earlier fit at this path would no longer match the new fit
+        gp_pred_cache_path(cache_path).unlink(missing_ok=True)
 
     return fit
 
@@ -404,6 +444,7 @@ def fit(
     cache_dir: Path | None = None,
     seed: int | None = None,
     override: bool = False,
+    log_y: bool = True,
 ) -> GPPosteriorFit:
     """`fit_gp_posterior` with its checkpoint at `gp_cache_path(cache_dir, len(configs))`.
 
@@ -418,6 +459,7 @@ def fit(
         cache_path=cache_path,
         seed=seed,
         override=override,
+        log_y=log_y,
     )
 
 
