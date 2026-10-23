@@ -196,7 +196,7 @@ def test_modified_jes_divides_by_the_normalized_exact_cost() -> None:
     gp = SingleTaskGP(x, y)
     gp.posterior(x)  # Fantasizing needs the caches of a prediction
     optima = {"optimal_inputs": x[:2], "optimal_outputs": y[:2] - 1}
-    log_cost = LogCost(encoder, _cost, reference_cost=1.0)
+    log_cost = LogCost(encoder, _cost)
     weighted = CostWeightedModifiedJES(
         gp, **optima, log_cost=log_cost, c_min_log=0.0, c_max_log=6.0
     )

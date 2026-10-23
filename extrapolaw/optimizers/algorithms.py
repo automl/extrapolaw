@@ -95,7 +95,7 @@ def _bo(  # noqa: C901, PLR0912
     budget_schedule: Literal[
         "none", "space_expansion", "left_budget_contraction"
     ] = "none",
-    target_flops: float | None = None,
+    target_flops: int | None = None,
 ) -> BayesianOptimization:
     """Initialise the BO loop.
 
@@ -1392,7 +1392,7 @@ def bayesian_optimization(
     budget_schedule: Literal[
         "none", "space_expansion", "left_budget_contraction"
     ] = "none",
-    target_flops: float | None = None,
+    target_flops: int | None = None,
     sample_prior_first: bool = False,
 ) -> BayesianOptimization:
     """Models the relation between hyperparameters in your `pipeline_space`

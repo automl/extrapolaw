@@ -82,7 +82,7 @@ def default_categorical_kernel(
 
 
 class LogCost:
-    """The `log10` cost of encoded configurations, clamped to `1e-10 * reference_cost`.
+    """The `log10` cost of encoded configurations
 
     Call it on an encoded tensor of shape `(..., d)` for the costs of shape `(...)`,
     differentiable through finite differences. The costs are memoized per encoded row, as
@@ -93,16 +93,15 @@ class LogCost:
         self,
         encoder: ConfigEncoder,
         cost_estimator: Callable[..., float],
-        *,
-        reference_cost: float = 1e16,
     ) -> None:
         self.encoder = encoder
         self.cost_estimator = cost_estimator
+        self.min_cost = 1e-6
         self._memo: dict[bytes, float] = {}
 
     def of_config(self, config: Mapping[str, Any]) -> float:
         """The `log10` cost of a single decoded configuration."""
-        return math.log10(float(self.cost_estimator(**config)))
+        return math.log10(max(float(self.cost_estimator(**config)), self.min_cost))
 
     def evaluate(self, x: torch.Tensor) -> torch.Tensor:
         """The `log10` costs of the rows of `x` of shape `(n, d)`, without gradient."""
@@ -250,7 +249,7 @@ def make_default_single_obj_gp(
 
     log_cost = None
     if cost_estimator is not None and len(numerics) > 0:
-        log_cost = LogCost(encoder, cost_estimator, reference_cost=min_cost)
+        log_cost = LogCost(encoder, cost_estimator)
 
     # Purely categorical
     if len(numerics) == 0:

@@ -838,7 +838,7 @@ class BayesianOptimization(ScalingOptimizer):
                         " it samples the optima around."
                     )
                 assert cost_estimator is not None
-                log_cost = LogCost(encoder, cost_estimator, reference_cost=target_flops)
+                log_cost = LogCost(encoder, cost_estimator)
                 log10_target = math.log10(target_flops)
                 distance = (log_cost.evaluate(raw_candidates) - log10_target).abs()
                 # Widen the window around the target FLOPs until it holds enough
