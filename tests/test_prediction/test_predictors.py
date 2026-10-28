@@ -17,7 +17,7 @@ from extrapolaw.prediction import (
     power_law,
 )
 from extrapolaw.prediction.scaling_law_fit import fit_power_law, predict_from_loglog_fit
-from extrapolaw.space import HPOFloat, SearchSpace
+from extrapolaw.space import HPOFloat, HPOInteger, SearchSpace
 
 TRUE_LAW = ScalingLawParameters(E=1.69, A=406.4, B=410.7, alpha=0.34, beta=0.28)
 

@@ -15,10 +15,10 @@ class MyOpt:
         n: int | None = None,
     ) -> SampledConfig | list[SampledConfig]: ...
 
-extrapolaw.run(..., optimizer=MyOpt)
+extrapolaw.acquire(..., optimizer=MyOpt)
 
 # Or with optimizer hyperparameters
-extrapolaw.run(..., optimizer=(MyOpt, {"a": 1, "b": 2}))
+extrapolaw.acquire(..., optimizer=(MyOpt, {"a": 1, "b": 2}))
 ```
 """
 
@@ -160,7 +160,7 @@ class AskFunction(Protocol):
         Note:
             This method is optional. Optimizers that don't need to persist artifacts
             should return None (the default behavior). The runtime only calls it,
-            after every evaluated trial, when running `extrapolaw.run(...,
+            after every evaluated trial, when running `extrapolaw.acquire(...,
             live_plots=True)`.
 
         Example:
@@ -187,7 +187,7 @@ class AskFunction(Protocol):
 class ScalingOptimizer:
     """Base class for optimizers that are Extrapolaw-native.
 
-    `extrapolaw.run(..., cost_estimator=..., max_cost_per_config=...)` hands both to
+    `extrapolaw.acquire(..., cost_estimator=..., max_cost_per_config=...)` hands both to
     every optimizer inheriting from this class, right after it was created.
 
     ```python
@@ -211,7 +211,7 @@ class ScalingOptimizer:
         *,
         max_cost_per_config: float | None = None,
     ) -> None:
-        """Called by `extrapolaw.run()` with the cost estimator of the run."""
+        """Called by `extrapolaw.acquire()` with the cost estimator of the run."""
         self.cost_estimator = cost_estimator
         self.max_cost_per_config = max_cost_per_config
 

@@ -41,7 +41,7 @@ ROOT_DIRECTORY = "results/hpo_vlm_openclip"
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=HPOSpace(),
         root_directory=ROOT_DIRECTORY,

@@ -93,7 +93,7 @@ def evaluate_pipeline(model: torch.nn.Module, batch_size: int) -> float:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=NN_Space(),
         root_directory="results/architecture_with_hp_example",

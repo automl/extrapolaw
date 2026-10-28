@@ -69,7 +69,7 @@ For example, running the following format, without specifying a optimizer will c
 the `pipeline_space` passed.
 
 ```python
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -84,7 +84,7 @@ We have also prepared some optimizers with specific hyperparameters that we beli
 You can use either the optimizer name or the optimizer class itself as the optimizer argument.
 
 ```python
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -105,7 +105,7 @@ For a list of available optimizers, please refer [here](./search_algorithms/land
 For users who want more control over the optimizer's hyperparameters, you can input a dictionary with your parameter choices together with the optimizer name.
 
 ```python
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -137,7 +137,7 @@ This is useful for:
 
 !!! tip "Reconstructing a Complete Run"
 
-    Combine `load_optimizer_info()` with `load_pipeline_space()` to fully reconstruct a previous optimization. See [Reconstructing and Reproducing Runs](extrapolaw_run.md#reconstructing-and-reproducing-runs) for a complete example.
+    Combine `load_optimizer_info()` with `load_pipeline_space()` to fully reconstruct a previous optimization. See [Reconstructing and Reproducing Runs](extrapolaw_acquire.md#reconstructing-and-reproducing-runs) for a complete example.
 
 ## 3 Scaling Optimizers
 
@@ -146,8 +146,8 @@ one good configuration for a fixed setting, they spend a search budget `C_search
 cheaper configurations and learn how the best configuration changes with cost. From this
 they predict the best configuration for a larger target cost.
 
-They draw on three arguments of `extrapolaw.run()`, see
-[estimating the cost of a configuration](extrapolaw_run.md#scaling-studies-estimating-the-cost-of-a-configuration):
+They draw on three arguments of `extrapolaw.acquire()`, see
+[estimating the cost of a configuration](extrapolaw_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration):
 
 - `cost_estimator`: the cost of a configuration, e.g. its FLOPs, known before it is
   evaluated. It is computed from the parameters marked with `is_compute_scaling=True`.
@@ -168,7 +168,7 @@ of every evaluation. That is either the `cost` returned by `evaluate_pipeline` o
 estimate of the `cost_estimator`:
 
 ```python
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -201,7 +201,7 @@ fixed.
 def estimate_params(width: int, layers: int) -> float:
     return ...
 
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -216,7 +216,7 @@ extrapolaw.run(
 ```
 
 1.  Required, see the
-    [`cost_estimator`](extrapolaw_run.md#scaling-studies-estimating-the-cost-of-a-configuration).
+    [`cost_estimator`](extrapolaw_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration).
 2.  Optional. No configuration estimated to cost more than this is laid out.
 3.  Required, the configurations are laid out to fit into this budget.
     `worker_cost_to_spend` is used if it is not given.
@@ -238,7 +238,7 @@ scaling of parameters and data with the compute is written to the `summary` fold
 
 ## 4 Custom Optimizers
 
-To design entirely new optimizers, you can define them as class with a `__call__` method outside of Extrapolaw and pass them to the `extrapolaw.run()` function:
+To design entirely new optimizers, you can define them as class with a `__call__` method outside of Extrapolaw and pass them to the `extrapolaw.acquire()` function:
 
 ```python
 @dataclass
@@ -257,10 +257,10 @@ class MyOptimizer:
         ...
 ```
 
-The class is then passed to the `extrapolaw.run()` function just like the built-in optimizers and can be configured the same way, using a dictionary:
+The class is then passed to the `extrapolaw.acquire()` function just like the built-in optimizers and can be configured the same way, using a dictionary:
 
 ```python
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -271,7 +271,7 @@ extrapolaw.run(
 
 For more details on how to define a custom optimizer see the [Optimizer Interface][extrapolaw.optimizers.optimizer.AskFunction].
 
-To receive the `cost_estimator` and `max_cost_per_config` given to `extrapolaw.run()`, like the [scaling optimizers](#3-scaling-optimizers), inherit from [`ScalingOptimizer`][extrapolaw.optimizers.optimizer.ScalingOptimizer]:
+To receive the `cost_estimator` and `max_cost_per_config` given to `extrapolaw.acquire()`, like the [scaling optimizers](#3-scaling-optimizers), inherit from [`ScalingOptimizer`][extrapolaw.optimizers.optimizer.ScalingOptimizer]:
 
 ```python
 class MyOptimizer(ScalingOptimizer):

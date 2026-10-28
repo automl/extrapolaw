@@ -3,7 +3,7 @@
 > **TL;DR**
 > *Sync*: return a scalar or a dict ⟶ Extrapolaw records it automatically.
 > *Async*: return `None`, launch a job, and call `extrapolaw.save_pipeline_results()` when the job finishes.
-> *Plots*: pass `live_plots=True` to `extrapolaw.run()` (sync) or to `extrapolaw.save_pipeline_results()` (async) to redraw them after every result.
+> *Plots*: pass `live_plots=True` to `extrapolaw.acquire()` (sync) or to `extrapolaw.save_pipeline_results()` (async) to redraw them after every result.
 
 ---
 
@@ -22,7 +22,7 @@ All other values raise a `TypeError` inside Extrapolaw.
 | key                     | purpose                                                                      | required?                     |
 | ----------------------- | ---------------------------------------------------------------------------- | ----------------------------- |
 | `objective_to_minimize` | scalar Extrapolaw will minimise                                                    | **yes**                       |
-| `cost`                  | wall‑clock, GPU‑hours, … —  Stopping criterion when passed `total_cost_to_spend` to `extrapolaw.run` | yes *iff* cost budget enabled |
+| `cost`                  | wall‑clock, GPU‑hours, … —  Stopping criterion when passed `total_cost_to_spend` to `extrapolaw.acquire` | yes *iff* cost budget enabled |
 | `learning_curve`        | list/np.array of intermediate objectives                                     | optional                      |
 | `extra`                 | any JSON‑serialisable blob                                                   | optional                      |
 | `exception`                 | any Exception illustrating the error in evaluation                                                   | optional                      |
@@ -30,7 +30,7 @@ All other values raise a `TypeError` inside Extrapolaw.
 > **Tip**  Return exactly what you need; extra keys are preserved in the trial’s `report.yaml`.
 
 > **Live plots**  When `evaluate_pipeline` returns its result (sync), the worker records it
-> and refreshes `root_directory/summary/`. Pass `live_plots=True` to `extrapolaw.run()` to also
+> and refreshes `root_directory/summary/`. Pass `live_plots=True` to `extrapolaw.acquire()` to also
 > redraw the plots every time: the incumbent trajectory, or the Pareto front for two
 > objectives, plus anything the optimizer provides. See
 > [Analysing Runs](analyse.md#live-plots-during-a-run).
@@ -151,13 +151,13 @@ extrapolaw.save_pipeline_results(
 
 This refreshes the general plots (incumbent trajectory or Pareto front) in
 `root_directory/summary/`. Optimizer-specific artifacts need the optimizer object, so
-they are only drawn by `extrapolaw.run(..., live_plots=True)`. To redraw everything once all
+they are only drawn by `extrapolaw.acquire(..., live_plots=True)`. To redraw everything once all
 jobs are done, call `extrapolaw.analyze(root_directory)`; see
 [Analysing Runs](analyse.md#plots-and-reports-extrapolawanalyze).
 
 ### 3.4 Common pitfalls
 
-* When using async approach, one worker, may create as many trials as possible, of course that in `Slurm` or other workload managers it's impossible to overload the system because of limitations set for each user, but if you want to control resources used for optimization, it's crucial to set desired stopping criteria (e.g `total_evaluations_to_spend` and/or `total_cost_to_spend`) when calling `extrapolaw.run`.
+* When using async approach, one worker, may create as many trials as possible, of course that in `Slurm` or other workload managers it's impossible to overload the system because of limitations set for each user, but if you want to control resources used for optimization, it's crucial to set desired stopping criteria (e.g `total_evaluations_to_spend` and/or `total_cost_to_spend`) when calling `extrapolaw.acquire`.
 
 ## 4 Extra injected arguments
 

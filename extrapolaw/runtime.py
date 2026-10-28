@@ -173,7 +173,7 @@ def _set_global_trial(trial: Trial) -> Iterator[None]:
 class DefaultWorker:
     """A default worker for the Extrapolaw system.
 
-    This is the worker that is used by default in the extrapolaw.run() loop.
+    This is the worker that is used by default in the extrapolaw.acquire() loop.
     """
 
     state: ExtrapolawState
@@ -970,8 +970,8 @@ def _derived_info_with_fidelity_name(
     return derived
 
 
-# TODO: This should be done directly in `api.run` at some point to make it clearer at an
-# entryy point how the worker is set up to run if someone reads the entry point code.
+# TODO: This should be done directly in `api.acquire` at some point to make it clearer at
+# an entryy point how the worker is set up to run if someone reads the entry point code.
 def _launch_runtime(  # noqa: PLR0913
     *,
     evaluation_fn: Callable[..., EvaluatePipelineReturn],

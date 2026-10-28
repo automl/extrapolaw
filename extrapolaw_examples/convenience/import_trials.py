@@ -145,7 +145,7 @@ def run_import_trials(optimizer):
     )
 
     # here we write something
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=get_evaluate_pipeline_func(optimizer=optimizer),
         pipeline_space=ExampleSpace(),
         root_directory=f"results/trial_import/initial_results_{optimizer}",
@@ -187,7 +187,7 @@ def run_import_trials(optimizer):
 
     logging.info(f"{'-' * 80} Running after import for optimizer {optimizer}. {'-' * 80}")
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=get_evaluate_pipeline_func(optimizer=optimizer),
         pipeline_space=ExampleSpace(),
         root_directory=f"results/trial_import/results_{optimizer}",

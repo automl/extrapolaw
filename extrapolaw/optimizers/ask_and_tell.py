@@ -197,7 +197,7 @@ class AskAndTell:
             result: The result of the evaluation. This can be an exception,
                 a float, or a mapping of values, similar to that which
                 you would return from `evaluate_pipeline` when your normally
-                call [`extrapolaw.run()`][extrapolaw.api.run].
+                call [`extrapolaw.acquire()`][extrapolaw.api.acquire].
             time_sampled: The time the configuration was sampled.
                 Only used as metadata.
             time_started: The time the configuration was started to be evaluated.
@@ -282,7 +282,7 @@ class AskAndTell:
             result: The result of the evaluation. This can be an exception,
                 a float, or a mapping of values, similar to that which
                 you would return from `evaluate_pipeline` when your normally
-                call [`extrapolaw.run()`][extrapolaw.api.run].
+                call [`extrapolaw.acquire()`][extrapolaw.api.acquire].
             time_end: The time the configuration was finished being evaluated.
                 Defaults to `time.time()`. Only used as metadata.
             evaluation_duration: The duration of the evaluation. Defaults

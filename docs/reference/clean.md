@@ -39,7 +39,7 @@ Trial IDs are reported in `metadata.json` within each config directory.
 ### Deleting Instead of Resetting
 
 By default, matched trials keep their config on disk and have their state reset to
-`pending` (clearing their report), so that a subsequent `extrapolaw.run` re-evaluates the
+`pending` (clearing their report), so that a subsequent `extrapolaw.acquire` re-evaluates the
 same configuration rather than sampling a new one. Pass `--delete` to instead remove
 the trial directory entirely:
 

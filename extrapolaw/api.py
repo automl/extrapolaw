@@ -22,7 +22,6 @@ from extrapolaw.optimizers import (
 from extrapolaw.optimizers.algorithms import PredefinedOptimizers
 from extrapolaw.runtime import _launch_runtime, _save_results
 from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import (
-    adjust_evaluation_pipeline_for_extrapolaw_space,
     check_extrapolaw_space_compatibility,
     convert_classic_to_extrapolaw_search_space,
     convert_extrapolaw_to_classic_search_space,
@@ -49,7 +48,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
     evaluate_pipeline: Callable[..., EvaluatePipelineReturn] | str,
     pipeline_space: ConfigurationSpace | PipelineSpace | None = None,
     *,
@@ -86,7 +85,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
     !!! tip "Parallelization"
 
         To run with multiple processes or machines, execute the script that
-        calls `extrapolaw.run()` multiple times. They will keep in sync using
+        calls `extrapolaw.acquire()` multiple times. They will keep in sync using
         the file-sytem, requiring that `root_directory` be shared between them.
 
 
@@ -119,7 +118,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
             prior_confidence="medium"
         )
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=MySpace(),
         root_directory="usage_example",
@@ -182,7 +181,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     prior_confidence="medium"
                 )
 
-            extrapolaw.run(
+            extrapolaw.acquire(
                 pipeline_space=MySpace()
             )
             ```
@@ -335,7 +334,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
             formats:
 
             ```python
-            extrapolaw.run(
+            extrapolaw.acquire(
                 ...,
                 optimizer=("priorband",
                     {
@@ -372,7 +371,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
                         #   The sampled configuration(s)
 
 
-                extrapolaw.run(
+                extrapolaw.acquire(
                     ...,
                     optimizer=MyOpt,
                 )
@@ -480,7 +479,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
             stacklevel=2,
         )
 
-    logger.info(f"Starting extrapolaw.run using root directory {root_directory}")
+    logger.info(f"Starting extrapolaw.acquire using root directory {root_directory}")
 
     # If continuing a run and optimizer is "auto" (default), load existing optimizer
     # with its parameters
@@ -492,7 +491,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     f"The run in '{root_path}' was started with the custom optimizer"
                     f" '{existing_optimizer_info['name']}', which cannot be rebuilt"
                     " from optimizer_info.yaml. Pass the same `optimizer` to"
-                    " `extrapolaw.run` to continue it."
+                    " `extrapolaw.acquire` to continue it."
                 )
             logger.info(
                 "Continuing optimization with existing optimizer: "
@@ -579,7 +578,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
         _eval = _with_estimated_cost(_eval, _cost_estimator)
     if isinstance(space, PipelineSpace):
         pass
-        # _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)  # TODO
+        # _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)  # TODO  # noqa: ERA001
 
     _launch_runtime(
         evaluation_fn=_eval,  # type: ignore
@@ -1065,7 +1064,7 @@ def create_config(  # noqa: C901
                     f" {Path(root_directory) / 'pipeline_space.pkl'}\nPlease either:\n"
                     "  1. Don't provide pipeline_space (it will be loaded automatically),"
                     " or\n  2. Provide the same pipeline_space that was used in"
-                    " extrapolaw.run()"
+                    " extrapolaw.acquire()"
                 )
     elif pipeline_space is None:
         raise ValueError(
@@ -1193,7 +1192,7 @@ def load_config(  # noqa: C901, PLR0912, PLR0915
                             f" {root_dir / 'pipeline_space.pkl'}\\nPlease either:\\n  1."
                             " Don't provide pipeline_space (it will be loaded"
                             " automatically), or\\n  2. Provide the same pipeline_space"
-                            " that was used in extrapolaw.run()"
+                            " that was used in extrapolaw.acquire()"
                         )
             except ExtrapolawError:
                 raise
@@ -1299,12 +1298,12 @@ def load_pipeline_space(
     """Load the pipeline space from an extrapolaw run directory.
 
     This is a convenience function that loads the pipeline space that was saved
-    during an extrapolaw.run() call. The pipeline space is automatically saved to disk
+    during an extrapolaw.acquire() call. The pipeline space is automatically saved to disk
     and can be loaded to inspect it or use it with other extrapolaw utilities.
 
     Args:
         root_directory: Path to the extrapolaw results directory (the same path
-            that was passed to extrapolaw.run()).
+            that was passed to extrapolaw.acquire()).
 
     Returns:
         The pipeline space that was used in the extrapolaw run.
@@ -1316,7 +1315,7 @@ def load_pipeline_space(
     Example:
         ```python
         # After running extrapolaw
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=my_function,
             pipeline_space=MySpace(),
             root_directory="results",
@@ -1354,13 +1353,14 @@ def load_optimizer_info(
 ) -> OptimizerInfo:
     """Load the optimizer information from an extrapolaw run directory.
 
-    This function loads the optimizer metadata that was saved during an extrapolaw.run()
-    call, including the optimizer name and its configuration parameters. This is
-    useful for inspecting what optimizer was used and with what settings.
+    This function loads the optimizer metadata that was saved during an
+    extrapolaw.acquire() call, including the optimizer name and its configuration
+    parameters. This is useful for inspecting what optimizer was used and with what
+    settings.
 
     Args:
         root_directory: Path to the extrapolaw results directory (the same path
-            that was passed to extrapolaw.run()).
+            that was passed to extrapolaw.acquire()).
 
     Returns:
         A dictionary containing:
@@ -1373,7 +1373,7 @@ def load_optimizer_info(
     Example:
         ```python
         # After running extrapolaw
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=my_function,
             pipeline_space=MySpace(),
             root_directory="results",
@@ -1401,6 +1401,7 @@ def load_optimizer_info(
 
 
 __all__ = [
+    "acquire",
     "analyze",
     "create_config",
     "import_trials",
@@ -1408,6 +1409,5 @@ __all__ = [
     "load_optimizer_info",
     "load_pipeline_space",
     "predict",
-    "run",
     "save_pipeline_results",
 ]

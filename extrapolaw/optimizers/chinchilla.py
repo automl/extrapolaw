@@ -1,8 +1,8 @@
 """Chinchilla guided scaling, see https://arxiv.org/abs/2203.15556.
 
 The configurations to evaluate are laid out once, on the first ask, from the
-`cost_estimator`, `max_cost_per_config` and cost budget given to `extrapolaw.run()`. They
-are then evaluated in order, like a grid search.
+`cost_estimator`, `max_cost_per_config` and cost budget given to
+`extrapolaw.acquire()`. They are then evaluated in order, like a grid search.
 """
 
 from __future__ import annotations
@@ -209,7 +209,8 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
 
         if self.cost_estimator is None:
             raise ValueError(
-                "Chinchilla needs a `cost_estimator` to be given to `extrapolaw.run()`."
+                "Chinchilla needs a `cost_estimator` to be given to"
+                " `extrapolaw.acquire()`."
             )
         budget = None
         if budget_info is not None:
@@ -219,7 +220,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
         if budget is None:
             raise ValueError(
                 "Chinchilla needs a cost budget, pass `total_cost_to_spend` or"
-                " `worker_cost_to_spend` to `extrapolaw.run()`."
+                " `worker_cost_to_spend` to `extrapolaw.acquire()`."
             )
 
         self.max_evaluation_flops = budget

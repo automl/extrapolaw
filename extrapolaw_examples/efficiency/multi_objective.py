@@ -121,7 +121,7 @@ class PriMOSpace(extrapolaw.PipelineSpace):
 logging.basicConfig(level=logging.INFO)
 
 # Run PriMO optimization
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=simulate_training,
     pipeline_space=PriMOSpace(),
     root_directory="results/primo_multi_objective",

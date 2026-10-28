@@ -9,7 +9,7 @@ Each sampled config needs a different amount of GPU memory, so sampling and
 training are decoupled: Extrapolaw just samples configs and hands each one off to a
 right-sized Slurm job, instead of one worker blocking on training.
 
-`generate_configs.py` drives the search: it calls `extrapolaw.run()` in asynchronous mode, so Extrapolaw only samples configs without immediate training.
+`generate_configs.py` drives the search: it calls `extrapolaw.acquire()` in asynchronous mode, so Extrapolaw only samples configs without immediate training.
 `array_job.py` then groups the sampled configs by GPU memory need and writes
 one Slurm array job per resource tier.
 

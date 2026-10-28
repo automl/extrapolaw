@@ -65,7 +65,7 @@ class HPOSpace(extrapolaw.PipelineSpace):
 
 
 logging.basicConfig(level=logging.INFO)
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline_via_slurm,
     pipeline_space=HPOSpace(),
     root_directory="results/slurm_script_example",

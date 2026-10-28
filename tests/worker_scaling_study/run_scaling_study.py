@@ -1,6 +1,6 @@
-"""Submits one Slurm job per `extrapolaw.run` worker, for each worker count of the study.
-Every worker gets its own 1-GPU allocation; the workers of a setting share a root
-directory.
+"""Submits one Slurm job per `extrapolaw.acquire` worker, for each worker count of the
+study. Every worker gets its own 1-GPU allocation; the workers of a setting share a
+root directory.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def job_dir_for(n_workers: int) -> Path:
 
 
 def write_job_script(n_workers: int, worker_index: int) -> Path:
-    """The sbatch script for a single worker: one `extrapolaw.run` on one GPU."""
+    """The sbatch script for a single worker: one `extrapolaw.acquire` on one GPU."""
     job_dir = job_dir_for(n_workers)
     job_dir.mkdir(parents=True, exist_ok=True)
 

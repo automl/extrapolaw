@@ -52,7 +52,7 @@ Using `extrapolaw` is based on the following pattern:
 
 1. Define an `evaluate_pipeline` function that evaluates a configuration of your pipeline.
 1. Define a `pipeline_space` of the parameters to optimize.
-1. Call `extrapolaw.run(evaluate_pipeline, pipeline_space)`.
+1. Call `extrapolaw.acquire(evaluate_pipeline, pipeline_space)`.
 1. Optionally, pass a `cost_estimator` and a cost budget to constrain the search by cost.
 
 In code, the usage pattern can look like this:
@@ -94,7 +94,7 @@ def estimate_flops(width: int) -> float:
 
 
 # 3. Run the Extrapolaw optimization
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     pipeline_space=ExampleSpace(),
     root_directory="path/to/save/results",  # Replace with the actual path.
@@ -133,7 +133,7 @@ To run them locally instead, see the [tutorials folder](https://github.com/autom
 ### Documentation
 
 - [Getting started](getting_started.md)
-- [Reference](reference/extrapolaw_run.md): running Extrapolaw, search spaces, optimizers, and analysing runs
+- [Reference](reference/extrapolaw_acquire.md): running Extrapolaw, search spaces, optimizers, and analysing runs
 - [Scaling optimizers](reference/optimizers.md#3-scaling-optimizers): cost-constrained search guided by scaling laws
 - [Algorithms](reference/search_algorithms/landing_page_algo.md)
 - [API](api/extrapolaw/api.md)

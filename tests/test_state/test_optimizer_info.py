@@ -123,7 +123,7 @@ def test_auto_resume_of_custom_optimizer_raises_clear_error(tmp_path: Path) -> N
     _create_or_load(root, OptimizerInfo(name="<lambda>", info={}))
 
     with pytest.raises(ValueError, match="custom optimizer '<lambda>'"):
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=lambda x, epochs: x + epochs,
             pipeline_space=_PipelineSpace(),
             root_directory=root,

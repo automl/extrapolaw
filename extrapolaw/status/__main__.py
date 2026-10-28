@@ -1,11 +1,11 @@
-"""Displays status information about a working directory of an extrapolaw.run.
+"""Displays status information about a working directory of an extrapolaw.acquire.
 
 Usage:
     python -m extrapolaw.status [-h] [--best_objective_to_minimizees] [--best_configs]
         [--all_configs] working_directory
 
 Positional arguments:
-    working_directory  The working directory given to extrapolaw.run
+    working_directory  The working directory given to extrapolaw.acquire
 
 Optional arguments:
     -h, --help         show this help message and exit
@@ -34,10 +34,10 @@ from .status import status
 parser = argparse.ArgumentParser(
     prog="python -m extrapolaw.status",
     description="Displays status information about a working directory of an "
-    "extrapolaw.run",
+    "extrapolaw.acquire",
 )
 parser.add_argument("root_directory", type=Path,
-                    help="The working directory given to extrapolaw.run")
+                    help="The working directory given to extrapolaw.acquire")
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.WARN)

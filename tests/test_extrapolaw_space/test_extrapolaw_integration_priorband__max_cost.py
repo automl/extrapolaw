@@ -98,7 +98,7 @@ def test_hyperparameter_with_fidelity_demo_new(optimizer, optimizer_name, tmp_pa
     # Reset the _COSTS global, so they do not get mixed up between tests.
     _COSTS.clear()
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -138,7 +138,7 @@ def test_hyperparameter_with_fidelity_demo_old(optimizer, optimizer_name, tmp_pa
     # Reset the _COSTS global, so they do not get mixed up between tests.
     _COSTS.clear()
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=pipeline_space,
         optimizer=optimizer,

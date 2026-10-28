@@ -1,5 +1,5 @@
 """Plots, with the CSV of their points, saved to the summary folder by
-`extrapolaw.run(..., live_plots=True)`.
+`extrapolaw.acquire(..., live_plots=True)`.
 """
 
 from __future__ import annotations

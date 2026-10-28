@@ -159,7 +159,7 @@ if __name__ == "__main__":
         weight_decay = extrapolaw.Float(1e-5, 0.1, log=True)
         epochs = extrapolaw.IntegerFidelity(1, 10)
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         pipeline_space=ModelSpace(),
         evaluate_pipeline=training_pipeline,
         optimizer="ifbo",

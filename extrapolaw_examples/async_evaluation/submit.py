@@ -52,7 +52,7 @@ class ExampleSpace(extrapolaw.PipelineSpace):
     lr = extrapolaw.Float(lower=10e-7, upper=10e-3, log=True)
 
 
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline_via_slurm,
     pipeline_space=ExampleSpace(),
     root_directory="results/async_evaluation",

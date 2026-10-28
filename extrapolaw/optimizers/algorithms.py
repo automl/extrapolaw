@@ -6,16 +6,16 @@ This module conveniently starts with 'a' to be at the top and
 is where most of the code documentation for optimizers can be found.
 
 Below you will find some functions with some sane defaults documenting
-the parameters available. You can pass these functoins to `extrapolaw.run()`
+the parameters available. You can pass these functoins to `extrapolaw.acquire()`
 if you like, otherwise you may also refer to them by their string name.
 """
 
 # NOTE: If updating this file with new optimizers, please be aware that
-# the documentation here is what is shown in the `extrapolaw.run()` documentation.
+# the documentation here is what is shown in the `extrapolaw.acquire()` documentation.
 # Heres a checklist:
 # 1. Add you function and document it
 # 2. Add it to the `OptimizerChoice` at the bottom of this file.
-# 3. Add a section to `extrapolaw.run()`
+# 3. Add a section to `extrapolaw.acquire()`
 
 from __future__ import annotations
 
@@ -1688,12 +1688,12 @@ def carbs(
     CARBS is an external library, install it with `pip install extrapolaw[carbs]`.
 
     It needs the cost of every evaluation. Either return a `cost` from your
-    `evaluate_pipeline`, or pass a `cost_estimator` to `extrapolaw.run()`. With
+    `evaluate_pipeline`, or pass a `cost_estimator` to `extrapolaw.acquire()`. With
     `max_cost_per_config`, CARBS does not suggest configurations it predicts to be
     more expensive than that.
 
     ```python
-    extrapolaw.run(
+    extrapolaw.acquire(
         ...,
         optimizer="carbs",
         cost_estimator=estimate_flops,
@@ -1764,12 +1764,12 @@ def chinchilla(
     named `data_parameter_name` sets the amount of data. Every other parameter is
     drawn at random once and held fixed for the whole run.
 
-    It needs a `cost_estimator` and a cost budget to be given to `extrapolaw.run()`.
+    It needs a `cost_estimator` and a cost budget to be given to `extrapolaw.acquire()`.
     With `max_cost_per_config`, no configuration estimated to be more expensive than
     that is laid out.
 
     ```python
-    extrapolaw.run(
+    extrapolaw.acquire(
         ...,
         optimizer=(
             "chinchilla",

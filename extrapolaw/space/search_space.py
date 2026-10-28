@@ -79,7 +79,8 @@ class SearchSpace(
         for name, hp in self.elements.items():
             # Check if it's a new PipelineSpace parameter
             if isinstance(hp, PSFloat | PSInteger | PSCategorical):
-                # The user will get a warning from extrapolaw.run about using SearchSpace
+                # The user will get a warning from extrapolaw.acquire about using
+                # SearchSpace
                 if isinstance(hp, PSFloat):
                     # Extract prior if it exists
                     prior: float | None = None

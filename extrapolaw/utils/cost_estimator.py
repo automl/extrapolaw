@@ -66,7 +66,7 @@ class CostEstimator:
     def from_user(
         cls, spec: CostEstimator | Callable[..., float] | str | Path
     ) -> CostEstimator:
-        """Build an estimator from what was passed to `extrapolaw.run()`."""
+        """Build an estimator from what was passed to `extrapolaw.acquire()`."""
         if isinstance(spec, CostEstimator):
             return spec
         # If the spec is a string or Path, treat it as a JSON file

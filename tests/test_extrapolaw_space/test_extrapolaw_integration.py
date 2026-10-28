@@ -166,7 +166,7 @@ def test_hyperparameter_demo(optimizer, tmp_path):
     pipeline_space = DemoHyperparameterSpace()
     root_directory = tmp_path / f"hyperparameter_demo__{optimizer.func.__name__}"
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=hyperparameter_pipeline_to_optimize,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -190,7 +190,7 @@ def test_hyperparameter_with_fidelity_demo(optimizer, tmp_path):
         tmp_path / f"hyperparameter_with_fidelity_demo__{optimizer.func.__name__}"
     )
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=hyperparameter_pipeline_to_optimize,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -212,7 +212,7 @@ def test_hyperparameter_complex_demo(optimizer, tmp_path):
     pipeline_space = DemoHyperparameterComplexSpace()
     root_directory = tmp_path / f"hyperparameter_complex_demo__{optimizer.func.__name__}"
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=hyperparameter_pipeline_to_optimize,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -336,7 +336,7 @@ def test_operation_demo(optimizer, tmp_path):
     pipeline_space = DemoOperationSpace()
     root_directory = tmp_path / f"operation_demo__{optimizer.__name__}"
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=operation_pipeline_to_optimize,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -364,7 +364,7 @@ def test_extrapolaw_hyperband_with_fidelity_demo(optimizer, tmp_path):
         tmp_path / f"extrapolaw_hyperband_fidelity_demo__{optimizer.__name__}"
     )
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=hyperparameter_pipeline_to_optimize,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -553,7 +553,7 @@ def test_trajectory_and_metrics(tmp_path):
     root_directory = tmp_path / "metrics_test"
 
     # Run optimization
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_with_metrics,
         pipeline_space=space,
         optimizer=algorithms.extrapolaw_random_search,

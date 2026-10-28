@@ -1,4 +1,4 @@
-"""Plot incumbent from a root directory of an extrapolaw.run.
+"""Plot incumbent from a root directory of an extrapolaw.acquire.
 
 Usage:
     python -m extrapolaw.plot [-h] [--scientific_mode] [--key_to_extract] [--benchmarks]
@@ -7,7 +7,7 @@ Usage:
                           root_directory
 
 Positional arguments:
-    root_directory              The root directory given to extrapolaw.run
+    root_directory              The root directory given to extrapolaw.acquire
 
 Optional arguments:
     -h, --help                  Show this help message and exit
@@ -16,7 +16,7 @@ Optional arguments:
     --benchmarks                List of benchmarks to plot
     --algorithms                List of algorithms to plot
     --consider_continuations    If true, toggle calculation of continuation costs
-    --n_workers                 Number of parallel processes of extrapolaw.run
+    --n_workers                 Number of parallel processes of extrapolaw.acquire
     --x_range                   Bound x-axis (e.g. 1 10)
     --log_x                     If true, toggle logarithmic scale on the x-axis
     --log_y                     If true, toggle logarithmic scale on the y-axis
@@ -42,12 +42,12 @@ from .plot import plot
 # fmt: off
 parser = argparse.ArgumentParser(
     prog="python -m extrapolaw.plot",
-    description="Plot incumbent from a root directory of an extrapolaw.run"
+    description="Plot incumbent from a root directory of an extrapolaw.acquire"
 )
 parser.add_argument(
     "root_directory",
     type=Path,
-    help="The root directory given to extrapolaw.run"
+    help="The root directory given to extrapolaw.acquire"
 )
 parser.add_argument(
     "--scientific_mode",
@@ -80,7 +80,7 @@ parser.add_argument(
     "--n_workers",
     type=int,
     default=1,
-    help="Number of parallel processes of extrapolaw.run",
+    help="Number of parallel processes of extrapolaw.acquire",
 )
 parser.add_argument(
     "--x_range",

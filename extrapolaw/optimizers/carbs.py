@@ -59,7 +59,7 @@ class PowerOfBaseSpace(LogSpace):
             math.floor(math.log(self.max, self.base) + 1e-9),
         )
 
-    def param_from_basic(self, value: float, is_rounded: bool = True) -> float:
+    def param_from_basic(self, value: float, is_rounded: bool = True) -> float:  # noqa: FBT001, FBT002
         exponent = value * self.scale
         if not is_rounded:
             return self.base**exponent
@@ -140,7 +140,7 @@ class CARBSOptimizer(ScalingOptimizer):
     """Suggests configurations with CARBS, rebuilt from the trials on every ask.
 
     The cost of an evaluation is the `cost` reported for it. If none is reported, the
-    `cost_estimator` given to `extrapolaw.run()` is used.
+    `cost_estimator` given to `extrapolaw.acquire()` is used.
     """
 
     space: SearchSpace
@@ -207,7 +207,7 @@ class CARBSOptimizer(ScalingOptimizer):
         if self.cost_estimator is None or self.max_cost_per_config is None:
             raise ValueError(
                 "`search_center_cost_fraction` needs `cost_estimator` and"
-                " `max_cost_per_config` to be given to `extrapolaw.run()`."
+                " `max_cost_per_config` to be given to `extrapolaw.acquire()`."
             )
         if shrink is None:
             raise ValueError(
@@ -317,7 +317,7 @@ class CARBSOptimizer(ScalingOptimizer):
             raise ValueError(
                 f"CARBS needs the cost of every evaluation, but trial '{trial.id}'"
                 " has none. Return a `cost` from `evaluate_pipeline` or pass a"
-                " `cost_estimator` to `extrapolaw.run()`."
+                " `cost_estimator` to `extrapolaw.acquire()`."
             )
         return ObservationInParam(input=carbs_input, output=objective, cost=cost)
 

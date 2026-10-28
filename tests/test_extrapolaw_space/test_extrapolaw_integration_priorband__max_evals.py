@@ -82,7 +82,7 @@ def test_hyperparameter_with_fidelity_demo_new(optimizer, optimizer_name, tmp_pa
     pipeline_space = DemoHyperparameterWithFidelitySpace()
     root_directory = tmp_path / f"hyperparameter_with_fidelity__evals__{optimizer_name}"
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
@@ -120,7 +120,7 @@ def test_hyperparameter_with_fidelity_demo_old(optimizer, optimizer_name, tmp_pa
     pipeline_space = DemoHyperparameterWithFidelitySpace()
     root_directory = tmp_path / f"hyperparameter_with_fidelity__evals__{optimizer_name}"
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=pipeline_space,
         optimizer=optimizer,
