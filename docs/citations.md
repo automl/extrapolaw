@@ -2,12 +2,12 @@
 
 ## Citation of The Software
 
-For citing AutoScAn, please refer to the following:
+For citing Extrapolaw, please refer to the following:
 
 ### APA Style
 
 ```apa
-Nastaran A., Mallik, N., Bergman, E., Geburek, A. M., Schrodi, S., Basu, S., Birinxhiku, L., Abou Chakra, T., Garibov, S., Gaur, G., Alipour, N., Janowski, M., Hvarfner, C., Mekic, E., Carstensen, T., Rogalla, D., Ru, B., Hutter, F. & Stoll, D. (2026). Automated Scaling Analysis (AutoScAn) (Version 0.1.0) [Computer software]. https://github.com/automl/auto-scan
+Nastaran A., Mallik, N., Bergman, E., Geburek, A. M., Schrodi, S., Basu, S., Birinxhiku, L., Abou Chakra, T., Garibov, S., Gaur, G., Alipour, N., Janowski, M., Hvarfner, C., Mekic, E., Carstensen, T., Rogalla, D., Ru, B., Hutter, F. & Stoll, D. (2026). Extrapolaw (Version 0.1.0) [Computer software]. https://github.com/automl/extrapolaw
 ```
 
 ### BibTex Style
@@ -16,8 +16,8 @@ Nastaran A., Mallik, N., Bergman, E., Geburek, A. M., Schrodi, S., Basu, S., Bir
 @software{Alipour_Automated_Scaling_Analysis_2026,
 author = {Nastaran Alipour, Neeratyoy Mallik, Eddie Bergman, Anton Merlin Geburek, Simon Schrodi, Soham Basu, Lum Birinxhiku, Tarek Abou Chakra, Samir Garibov, Gopalji Gaur, Maciej Janowski, Ema Mekic, Philip Alex Ambattu, Daniel Rogalla, Carl Hvarfner, Binxin Ru, Timur Carstensen, Johannes Hog, Frank Hutter and Danny Stoll},
 month = sep,
-title = {{Automated Scaling Analysis (AutoScAn)}},
-url = {https://github.com/automl/auto-scan},
+title = {{Extrapolaw}},
+url = {https://github.com/automl/extrapolaw},
 version = {0.1.0},
 year = {2026}
 }
@@ -55,7 +55,7 @@ keywords = {}
 
 ### Hierarchichal NAS with Context-free Grammars
 
-If you have used the context-free grammar search space and the graph kernels implemented in AutoScAn (formerly NePS) for the paper [Hierarchical NAS](https://openreview.net/forum?id=Hpt1i5j6wh), please use the bibtex below:
+If you have used the context-free grammar search space and the graph kernels implemented in Extrapolaw (formerly NePS) for the paper [Hierarchical NAS](https://openreview.net/forum?id=Hpt1i5j6wh), please use the bibtex below:
 
 ```bibtex
 @inproceedings{schrodi2023hierarchical,

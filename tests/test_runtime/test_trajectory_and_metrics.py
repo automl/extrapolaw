@@ -1,4 +1,4 @@
-"""Tests for extended trajectory and metrics functionality in AutoScAn."""
+"""Tests for extended trajectory and metrics functionality in Extrapolaw."""
 
 from __future__ import annotations
 
@@ -9,24 +9,24 @@ from pathlib import Path
 
 import pytest
 
-import autoscan
-from autoscan.optimizers import algorithms
-from autoscan.runtime import DefaultWorker
-from autoscan.space.autoscan_spaces.parameters import (
+import extrapolaw
+from extrapolaw.optimizers import algorithms
+from extrapolaw.runtime import DefaultWorker
+from extrapolaw.space.extrapolaw_spaces.parameters import (
     Float,
     Integer,
     IntegerFidelity,
     PipelineSpace,
 )
-from autoscan.state.autoscan_state import AutoScAnState
-from autoscan.state.optimizer import OptimizationState
-from autoscan.state.seed_snapshot import SeedSnapshot
-from autoscan.state.settings import (
+from extrapolaw.state.extrapolaw_state import ExtrapolawState
+from extrapolaw.state.optimizer import OptimizationState
+from extrapolaw.state.seed_snapshot import SeedSnapshot
+from extrapolaw.state.settings import (
     DefaultReportValues,
     OnErrorPossibilities,
     WorkerSettings,
 )
-from autoscan.state.trial import (
+from extrapolaw.state.trial import (
     MetaData,
     State as TrialState,
     Trial,
@@ -96,10 +96,10 @@ def test_basic_trajectory_functionality():
         root_directory = Path(tmp_dir) / "basic_test"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=3,
             overwrite_root_directory=True,
@@ -135,10 +135,10 @@ def test_best_config_with_multiple_metrics():
         root_directory = Path(tmp_dir) / "best_config_test"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=5,
             overwrite_root_directory=True,
@@ -171,10 +171,10 @@ def test_trajectory_with_fidelity():
         root_directory = Path(tmp_dir) / "fidelity_test"
 
         # Run optimization with fidelity
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=fidelity_evaluation,
             pipeline_space=SpaceWithFidelity(),
-            optimizer=("autoscan_random_search", {"ignore_fidelity": True}),
+            optimizer=("extrapolaw_random_search", {"ignore_fidelity": True}),
             root_directory=str(root_directory),
             worker_evaluations_to_spend=10,
             overwrite_root_directory=True,
@@ -203,10 +203,10 @@ def test_cumulative_metrics_tracking():
         root_directory = Path(tmp_dir) / "cumulative_test"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=5,
             overwrite_root_directory=True,
@@ -241,10 +241,10 @@ def test_trajectory_with_failed_evaluations():
         root_directory = Path(tmp_dir) / "error_test"
 
         # Run optimization that will have some failures
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=failing_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=15,  # More evaluations to ensure some failures
             overwrite_root_directory=True,
@@ -270,16 +270,16 @@ def test_trajectory_with_failed_evaluations():
 # ===== Test hyperband-specific metrics =====
 
 
-def test_autoscan_hyperband_metrics():
-    """Test that autoscan_hyperband produces extended metrics."""
+def test_extrapolaw_hyperband_metrics():
+    """Test that extrapolaw_hyperband produces extended metrics."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         root_directory = Path(tmp_dir) / "hyperband_test"
 
-        # Run autoscan_hyperband optimization
-        autoscan.run(
+        # Run extrapolaw_hyperband optimization
+        extrapolaw.run(
             evaluate_pipeline=fidelity_evaluation,
             pipeline_space=SpaceWithFidelity(),
-            optimizer=algorithms.autoscan_hyperband,
+            optimizer=algorithms.extrapolaw_hyperband,
             root_directory=str(root_directory),
             worker_fidelities_to_spend=20,  # Budget for multi-fidelity optimization
             overwrite_root_directory=True,
@@ -310,7 +310,7 @@ def test_autoscan_hyperband_metrics():
 @pytest.mark.parametrize(
     "optimizer",
     [
-        algorithms.autoscan_random_search,
+        algorithms.extrapolaw_random_search,
         algorithms.complex_random_search,
     ],
 )
@@ -320,7 +320,7 @@ def test_metrics_with_different_optimizers(optimizer):
         root_directory = Path(tmp_dir) / f"optimizer_test_{optimizer.__name__}"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=optimizer,
@@ -362,10 +362,10 @@ def test_metric_values_are_reasonable():
         root_directory = Path(tmp_dir) / "validation_test"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=5,
             overwrite_root_directory=True,
@@ -401,10 +401,10 @@ def test_trajectory_file_format():
         root_directory = Path(tmp_dir) / "format_test"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=3,
             overwrite_root_directory=True,
@@ -436,10 +436,10 @@ def test_results_directory_structure():
         root_directory = Path(tmp_dir) / "structure_test"
 
         # Run optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=3,
             overwrite_root_directory=True,
@@ -462,16 +462,16 @@ def test_results_directory_structure():
             assert len(content.strip()) > 0, f"{filename} should not be empty"
 
 
-def test_autoscan_revisit_run_with_trajectory():
-    """Test that AutoScAn can revisit an earlier run and use incumbent trajectory."""
+def test_extrapolaw_revisit_run_with_trajectory():
+    """Test that Extrapolaw can revisit an earlier run and use incumbent trajectory."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         root_directory = Path(tmp_dir) / "revisit_test"
 
         # First run - create initial optimization
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=3,
             overwrite_root_directory=True,  # Start fresh
@@ -491,10 +491,10 @@ def test_autoscan_revisit_run_with_trajectory():
         assert "Objective to minimize:" in initial_trajectory
 
         # Second run - revisit without overwriting
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=2,  # Add 2 more evaluations
             overwrite_root_directory=False,  # Don't overwrite, continue from previous
@@ -545,10 +545,10 @@ def test_continue_finished_run_with_higher_budget(run_number):
 
         # First run - complete optimization with HIGH budget to find a good solution
         initial_budget = 20
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=initial_budget,
             overwrite_root_directory=True,
@@ -584,10 +584,10 @@ def test_continue_finished_run_with_higher_budget(run_number):
         additional_budget = 5
         total_expected_budget = initial_budget + additional_budget
 
-        autoscan.run(
+        extrapolaw.run(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
-            optimizer=algorithms.autoscan_random_search,
+            optimizer=algorithms.extrapolaw_random_search,
             root_directory=str(root_directory),
             worker_evaluations_to_spend=additional_budget,
             overwrite_root_directory=False,  # Continue from previous run
@@ -697,9 +697,9 @@ def test_best_config_multiobjective_frontier():
     with tempfile.TemporaryDirectory() as tmp_dir:
         root_directory = Path(tmp_dir) / "mo_test"
 
-        # Create an empty AutoScAn state (optimizer info is minimal)
+        # Create an empty Extrapolaw state (optimizer info is minimal)
         optimizer_info = {"name": "test_opt", "info": {}}
-        state = AutoScAnState.create_or_load(
+        state = ExtrapolawState.create_or_load(
             path=root_directory,
             optimizer_info=optimizer_info,
             optimizer_state=OptimizationState(

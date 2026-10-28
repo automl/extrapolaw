@@ -10,9 +10,9 @@ import mkdocs_gen_files
 
 logger = logging.getLogger(__name__)
 
-SRCDIR = Path("autoscan").absolute().resolve()
+SRCDIR = Path("extrapolaw").absolute().resolve()
 ROOT = SRCDIR.parent
-EXAMPLE_FOLDER = ROOT / "autoscan_examples"
+EXAMPLE_FOLDER = ROOT / "extrapolaw_examples"
 TAB = "    "
 
 if not SRCDIR.exists():

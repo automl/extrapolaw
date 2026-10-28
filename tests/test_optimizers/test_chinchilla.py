@@ -5,23 +5,23 @@ import time
 import matplotlib as mpl
 import pytest
 
-from autoscan.optimizers import load_optimizer
-from autoscan.optimizers.algorithms import chinchilla
-from autoscan.optimizers.chinchilla import (
+from extrapolaw.optimizers import load_optimizer
+from extrapolaw.optimizers.algorithms import chinchilla
+from extrapolaw.optimizers.chinchilla import (
     ChinchillaGuidedScaling,
     _pareto_front,
     _ScalingPoint,
 )
-from autoscan.optimizers.optimizer import SampledConfig, ScalingOptimizer
-from autoscan.space import (
+from extrapolaw.optimizers.optimizer import SampledConfig, ScalingOptimizer
+from extrapolaw.space import (
     HPOCategorical,
     HPOConstant,
     HPOFloat,
     HPOInteger,
     SearchSpace,
 )
-from autoscan.state import BudgetInfo, Trial
-from autoscan.utils.cost_estimator import CostEstimator
+from extrapolaw.state import BudgetInfo, Trial
+from extrapolaw.utils.cost_estimator import CostEstimator
 
 mpl.use("Agg")
 

@@ -2,7 +2,7 @@
 
 ## Getting Help
 
-Please use our github and raise an issue at: [https://github.com/automl/auto-scan](https://github.com/automl/auto-scan)
+Please use our github and raise an issue at: [https://github.com/automl/extrapolaw](https://github.com/automl/extrapolaw)
 
 ## Development Workflow
 
@@ -17,8 +17,8 @@ Automatic checks are run on every pull request and on every commit to `master`.
 There are four steps:
 
 1. Install uv
-1. Clone the autoscan repository
-1. Create virtual env and install the autoscan package
+1. Clone the extrapolaw repository
+1. Create virtual env and install the extrapolaw package
 1. Activate pre-commit for the repository
 
 For instructions see below.
@@ -37,31 +37,31 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### 2. Clone the autoscan repository
+### 2. Clone the extrapolaw repository
 
 ```bash
-git clone https://github.com/automl/auto-scan.git
-cd autoscan
+git clone https://github.com/automl/extrapolaw.git
+cd extrapolaw
 ```
 
-### 3. Create a virtual environment and install the autoscan package
+### 3. Create a virtual environment and install the extrapolaw package
 
 ```bash
 uv venv --python 3.11
 source .venv/bin/activate
 ```
 
-Then, inside the main directory of autoscan run
+Then, inside the main directory of extrapolaw run
 
 ```bash
 uv pip install -e ".[dev]"
 ```
 
-This will installthe autoscan package but also additional dev dependencies.
+This will installthe extrapolaw package but also additional dev dependencies.
 
 ### 4. Activate pre-commit for the repository
 
-With the python environment used to install the autoscan package run in the main directory of autoscan
+With the python environment used to install the extrapolaw package run in the main directory of extrapolaw
 
 ```bash
 pre-commit install
@@ -79,9 +79,9 @@ your choice, e.g.
 We have setup checks and tests at several points in the development flow:
 
 - At every commit we automatically run a suite of [pre-commit](https://pre-commit.com/) hooks that perform static code analysis, autoformating, and sanity checks.
-This is setup during our [installation process](https://automl.github.io/auto-scan/contributing/installation/).
+This is setup during our [installation process](https://automl.github.io/extrapolaw/contributing/installation/).
 - At every commit / push locally running a minimal suite of integration tests is encouraged.
-The tests correspond directly to examples in [autoscan_examples](https://github.com/automl/auto-scan/tree/master/autoscan_examples) and only check for crash-causing errors.
+The tests correspond directly to examples in [extrapolaw_examples](https://github.com/automl/extrapolaw/tree/master/extrapolaw_examples) and only check for crash-causing errors.
 
 ## Checks and tests
 
@@ -90,7 +90,7 @@ For linting we use `ruff` for checking code quality. You can install it locally 
 
 ```bash
 uv pip install ruff
-ruff check --fix autoscan  # the --fix flag will try to fix issues it can automatically
+ruff check --fix extrapolaw  # the --fix flag will try to fix issues it can automatically
 ```
 
 This will also be run using `pre-commit` hooks.
@@ -112,7 +112,7 @@ For type checking we use `mypy`. You can install it locally and use it as so:
 
 ```bash
 uv pip install mypy
-mypy autoscan
+mypy extrapolaw
 ```
 
 Types are helpful for making your code more understandable by your editor and tools, allowing them to warn you of
@@ -134,7 +134,7 @@ df.mean()  # Is this another dataframe, a series or a single number?
 In the worse case, please just use `Any` and move on with your life, the type checker is meant to help you catch bugs,
 not hinder you. However it will take some experience to know whe it's trying to tell you something useful vs. something
 it just can not infer properly. A good rule of thumb is that you're only dealing with simple native types from python
-or types defined from AutoScAn, there is probably a good reason for a mypy error.
+or types defined from Extrapolaw, there is probably a good reason for a mypy error.
 
 If you have issues regarding typing, please feel free to reach out for help `@eddiebergman`.
 
@@ -152,7 +152,7 @@ There are two options:
 
 ### Examples and Integration Tests
 
-We use some examples in [autoscan_examples](https://github.com/automl/auto-scan/tree/master/autoscan_examples) as integration tests, which we run from the main directory via
+We use some examples in [extrapolaw_examples](https://github.com/automl/extrapolaw/tree/master/extrapolaw_examples) as integration tests, which we run from the main directory via
 
 ```bash
 pytest
@@ -194,7 +194,7 @@ uv pip install -e ".[dev]"
 We use [MkDocs](https://www.mkdocs.org/getting-started/), more specifically [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) for documentation.
 To support documentation for multiple versions, we use the plugin [mike](https://github.com/jimporter/mike).
 
-Source files for the documentation are under `/docs` and configuration at  [mkdocs.yml](https://github.com/automl/auto-scan/tree/master/mkdocs.yml).
+Source files for the documentation are under `/docs` and configuration at  [mkdocs.yml](https://github.com/automl/extrapolaw/tree/master/mkdocs.yml).
 
 To build and view the documentation run
 
@@ -217,7 +217,7 @@ See [tutorials README](./tutorials/README.md).
 
 ## Releasing a New Version
 
-There are five steps to releasing a new version of autoscan:
+There are five steps to releasing a new version of extrapolaw:
 
 0. Understand Semantic Versioning
 1. Run Tests

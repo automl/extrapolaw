@@ -12,12 +12,12 @@ It is defined using the `is_fidelity` parameter in the `pipeline_space` definiti
 
 ```python
 pipeline_space = {
-    "epoch": autoscan.Integer(lower=1, upper=100, is_fidelity=True),
+    "epoch": extrapolaw.Integer(lower=1, upper=100, is_fidelity=True),
     # epoch will be available as fidelity to the optimizer
 }
 ```
 
-For a more detailed explanation of Multi-Fidelity and a list of AutoScAn-optimizers using MF please refer [here](../reference/search_algorithms/multifidelity.md).
+For a more detailed explanation of Multi-Fidelity and a list of Extrapolaw-optimizers using MF please refer [here](../reference/search_algorithms/multifidelity.md).
 
 ### 1.2 Priors
 
@@ -27,37 +27,37 @@ It is defined using the `prior` parameter in the `pipeline_space` definition.
 
 ```python
 pipeline_space = {
-    "alpha": autoscan.Float(lower=0.1, upper=1.0, prior=0.4, prior_confidence="high"),
+    "alpha": extrapolaw.Float(lower=0.1, upper=1.0, prior=0.4, prior_confidence="high"),
     # alpha will have a prior pointing towards 0.4 with high confidence
 }
 ```
 
-For a more detailed explanation of Priors and a list of AutoScAn-optimizers using Priors please refer [here](../reference/search_algorithms/prior.md).
+For a more detailed explanation of Priors and a list of Extrapolaw-optimizers using Priors please refer [here](../reference/search_algorithms/prior.md).
 
-## 2 AutoScAn Optimizer Selection
+## 2 Extrapolaw Optimizer Selection
 
 ### 2.1 Automatic Optimizer Selection
 
-AutoScAn provides a multitude of optimizers from the literature, the [algorithms](../reference/search_algorithms/landing_page_algo.md) section goes into detail on each of them. This chapter focusses on how to select them when using AutoScAn.
+Extrapolaw provides a multitude of optimizers from the literature, the [algorithms](../reference/search_algorithms/landing_page_algo.md) section goes into detail on each of them. This chapter focusses on how to select them when using Extrapolaw.
 
 ✅ = supported/necessary, ❌ = not supported, ✔️* = optional, click for details, ✖️\* ignorable, click for details
 
-| Algorithm         | [Multi-Fidelity](../reference/search_algorithms/multifidelity.md) | [Priors](../reference/search_algorithms/prior.md) | Model-based | [AutoScAn-ready](../reference/autoscan_spaces.md#3-constructing-architecture-spaces) | Multi-Objective |
+| Algorithm         | [Multi-Fidelity](../reference/search_algorithms/multifidelity.md) | [Priors](../reference/search_algorithms/prior.md) | Model-based | [Extrapolaw-ready](../reference/extrapolaw_spaces.md#3-constructing-architecture-spaces) | Multi-Objective |
 | :- | :------------: | :----: | :---------: | :-----------------: | :---------------: |
-| `Grid Search`|[️️✖️*][autoscan.optimizers.algorithms.grid_search]|❌|❌|✅|❌|
-| `Random Search`|[️️✖️*][autoscan.optimizers.algorithms.random_search]|[✔️*][autoscan.optimizers.algorithms.random_search]|❌|✅|❌|
-| [`Bayesian Optimization`](../reference/search_algorithms/bayesian_optimization.md)|[️️✖️*][autoscan.optimizers.algorithms.bayesian_optimization]|❌|✅|❌|❌|
-| [`Successive Halving`](../reference/search_algorithms/multifidelity.md#1-successive-halfing)|✅|[✔️*][autoscan.optimizers.algorithms.successive_halving]|❌|✅|❌|
-| [`ASHA`](../reference/search_algorithms/multifidelity.md#asynchronous-successive-halving)|✅|[✔️*][autoscan.optimizers.algorithms.asha]|❌|✅|❌|
-| [`Hyperband`](../reference/search_algorithms/multifidelity.md#2-hyperband)|✅|[✔️*][autoscan.optimizers.algorithms.hyperband]|❌|✅|❌|
-| [`Asynch HB`](../reference/search_algorithms/multifidelity.md)|✅|[✔️*][autoscan.optimizers.algorithms.async_hb]|❌|✅|❌|
-| [`IfBO`](../reference/search_algorithms/multifidelity.md#3-in-context-freeze-thaw-bayesian-optimization)|✅|[✔️*][autoscan.optimizers.algorithms.ifbo]|✅|❌|❌|
-| [`PiBO`](../reference/search_algorithms/prior.md#1-pibo)|[️️✖️*][autoscan.optimizers.algorithms.pibo]|✅|✅|❌|❌|
+| `Grid Search`|[️️✖️*][extrapolaw.optimizers.algorithms.grid_search]|❌|❌|✅|❌|
+| `Random Search`|[️️✖️*][extrapolaw.optimizers.algorithms.random_search]|[✔️*][extrapolaw.optimizers.algorithms.random_search]|❌|✅|❌|
+| [`Bayesian Optimization`](../reference/search_algorithms/bayesian_optimization.md)|[️️✖️*][extrapolaw.optimizers.algorithms.bayesian_optimization]|❌|✅|❌|❌|
+| [`Successive Halving`](../reference/search_algorithms/multifidelity.md#1-successive-halfing)|✅|[✔️*][extrapolaw.optimizers.algorithms.successive_halving]|❌|✅|❌|
+| [`ASHA`](../reference/search_algorithms/multifidelity.md#asynchronous-successive-halving)|✅|[✔️*][extrapolaw.optimizers.algorithms.asha]|❌|✅|❌|
+| [`Hyperband`](../reference/search_algorithms/multifidelity.md#2-hyperband)|✅|[✔️*][extrapolaw.optimizers.algorithms.hyperband]|❌|✅|❌|
+| [`Asynch HB`](../reference/search_algorithms/multifidelity.md)|✅|[✔️*][extrapolaw.optimizers.algorithms.async_hb]|❌|✅|❌|
+| [`IfBO`](../reference/search_algorithms/multifidelity.md#3-in-context-freeze-thaw-bayesian-optimization)|✅|[✔️*][extrapolaw.optimizers.algorithms.ifbo]|✅|❌|❌|
+| [`PiBO`](../reference/search_algorithms/prior.md#1-pibo)|[️️✖️*][extrapolaw.optimizers.algorithms.pibo]|✅|✅|❌|❌|
 | [`PriorBand`](../reference/search_algorithms/multifidelity_prior.md#1-priorband)|✅|✅|✅|✅|❌|
 | [`PriMO`](../reference/search_algorithms/multi_objective.md/#primo-prior-informed-multi-objective-optimizer)|✅|✅|❌|❌|✅|
 
 If you prefer not to specify a particular optimizer for your AutoML task, you can simply pass `"auto"` or `None`
-for the autoscan optimizer. This provides a hassle-free way to get started quickly, as AutoScAn will automatically choose the best optimizer based on the characteristics of your search
+for the extrapolaw optimizer. This provides a hassle-free way to get started quickly, as Extrapolaw will automatically choose the best optimizer based on the characteristics of your search
 space:
 
 - If it has fidelity: [`hyperband`](../reference/search_algorithms/multifidelity.md#2-hyperband)
@@ -69,7 +69,7 @@ For example, running the following format, without specifying a optimizer will c
 the `pipeline_space` passed.
 
 ```python
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -78,19 +78,19 @@ autoscan.run(
 )
 ```
 
-### 2.2 Choosing one of AutoScAn Optimizers
+### 2.2 Choosing one of Extrapolaw Optimizers
 
-We have also prepared some optimizers with specific hyperparameters that we believe can generalize well to most AutoML tasks and use cases. The available optimizers are imported via the `autoscan.algorithms` module.
+We have also prepared some optimizers with specific hyperparameters that we believe can generalize well to most AutoML tasks and use cases. The available optimizers are imported via the `extrapolaw.algorithms` module.
 You can use either the optimizer name or the optimizer class itself as the optimizer argument.
 
 ```python
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
     total_evaluations_to_spend=25,
     # optimizer specified, along with an argument
-    optimizer=autoscan.algorithms.bayesian_optimization, # or as string: "bayesian_optimization"
+    optimizer=extrapolaw.algorithms.bayesian_optimization, # or as string: "bayesian_optimization"
 )
 ```
 
@@ -98,14 +98,14 @@ For a list of available optimizers, please refer [here](./search_algorithms/land
 
 !!! tip "Interactive tutorial"
 
-    The Optimizer Selection section of the [Efficient Optimization tutorial](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/3_efficiency_techniques.ipynb) lists all built-in optimizers with their default hyperparameters and runs several of them on the same task.
+    The Optimizer Selection section of the [Efficient Optimization tutorial](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/3_efficiency_techniques.ipynb) lists all built-in optimizers with their default hyperparameters and runs several of them on the same task.
 
 ### 2.3 Hyperparameter Overrides
 
 For users who want more control over the optimizer's hyperparameters, you can input a dictionary with your parameter choices together with the optimizer name.
 
 ```python
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -116,13 +116,13 @@ autoscan.run(
 
 ### 2.4 Loading Optimizer Information
 
-AutoScAn automatically saves the optimizer metadata (name and configuration) when you run an optimization. You can retrieve this information later using `autoscan.load_optimizer_info()`:
+Extrapolaw automatically saves the optimizer metadata (name and configuration) when you run an optimization. You can retrieve this information later using `extrapolaw.load_optimizer_info()`:
 
 ```python
-import autoscan
+import extrapolaw
 
 # Load the optimizer info from a previous run
-optimizer_info = autoscan.load_optimizer_info("path/to/autoscan_folder")
+optimizer_info = extrapolaw.load_optimizer_info("path/to/extrapolaw_folder")
 
 # Access the optimizer name and configuration
 print(f"Optimizer: {optimizer_info['name']}")
@@ -137,7 +137,7 @@ This is useful for:
 
 !!! tip "Reconstructing a Complete Run"
 
-    Combine `load_optimizer_info()` with `load_pipeline_space()` to fully reconstruct a previous optimization. See [Reconstructing and Reproducing Runs](autoscan_run.md#reconstructing-and-reproducing-runs) for a complete example.
+    Combine `load_optimizer_info()` with `load_pipeline_space()` to fully reconstruct a previous optimization. See [Reconstructing and Reproducing Runs](extrapolaw_run.md#reconstructing-and-reproducing-runs) for a complete example.
 
 ## 3 Scaling Optimizers
 
@@ -146,8 +146,8 @@ one good configuration for a fixed setting, they spend a search budget `C_search
 cheaper configurations and learn how the best configuration changes with cost. From this
 they predict the best configuration for a larger target cost.
 
-They draw on three arguments of `autoscan.run()`, see
-[estimating the cost of a configuration](autoscan_run.md#scaling-studies-estimating-the-cost-of-a-configuration):
+They draw on three arguments of `extrapolaw.run()`, see
+[estimating the cost of a configuration](extrapolaw_run.md#scaling-studies-estimating-the-cost-of-a-configuration):
 
 - `cost_estimator`: the cost of a configuration, e.g. its FLOPs, known before it is
   evaluated. It is computed from the parameters marked with `is_compute_scaling=True`.
@@ -156,8 +156,8 @@ They draw on three arguments of `autoscan.run()`, see
 
 | Optimizer | Approach | Supports | Install |
 | :- | :- | :- | :- |
-| [`carbs`][autoscan.optimizers.algorithms.carbs] | Cost-aware BO along the pareto front of objective and cost | `Integer` and `Float` parameters, no fidelities | `pip install auto-scan[carbs]` |
-| [`chinchilla`][autoscan.optimizers.algorithms.chinchilla] | Splits compute between model size and data on ISO-FLOP levels | Needs `cost_estimator` and `total_cost_to_spend`, no fidelities | Included |
+| [`carbs`][extrapolaw.optimizers.algorithms.carbs] | Cost-aware BO along the pareto front of objective and cost | `Integer` and `Float` parameters, no fidelities | `pip install extrapolaw[carbs]` |
+| [`chinchilla`][extrapolaw.optimizers.algorithms.chinchilla] | Splits compute between model size and data on ISO-FLOP levels | Needs `cost_estimator` and `total_cost_to_spend`, no fidelities | Included |
 
 ### 3.1 CARBS
 
@@ -168,7 +168,7 @@ of every evaluation. That is either the `cost` returned by `evaluate_pipeline` o
 estimate of the `cost_estimator`:
 
 ```python
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -183,14 +183,14 @@ If the center of the space is too expensive to start from, set
 e.g. the size of the dataset, is halved until the search center costs at most that
 fraction of `max_cost_per_config`.
 
-CARBS wraps an external library, so it is not installed with AutoScAn. Install it with
-`pip install auto-scan[carbs]`. It does not keep any files of its own. Its state is
+CARBS wraps an external library, so it is not installed with Extrapolaw. Install it with
+`pip install extrapolaw[carbs]`. It does not keep any files of its own. Its state is
 rebuilt from the trials in the `root_directory` whenever a configuration is sampled, so
 runs can be continued and parallelized like with any other optimizer.
 
 ### 3.2 Chinchilla Guided Scaling
 
-[`chinchilla`][autoscan.optimizers.algorithms.chinchilla] follows
+[`chinchilla`][extrapolaw.optimizers.algorithms.chinchilla] follows
 [Training Compute-Optimal Large Language Models](https://arxiv.org/abs/2203.15556). It
 lays out a static list of configurations that grow the model and the amount of data together,
 to find how a compute budget should be split between the two. The parameters marked
@@ -201,7 +201,7 @@ fixed.
 def estimate_params(width: int, layers: int) -> float:
     return ...
 
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -216,7 +216,7 @@ autoscan.run(
 ```
 
 1.  Required, see the
-    [`cost_estimator`](autoscan_run.md#scaling-studies-estimating-the-cost-of-a-configuration).
+    [`cost_estimator`](extrapolaw_run.md#scaling-studies-estimating-the-cost-of-a-configuration).
 2.  Optional. No configuration estimated to cost more than this is laid out.
 3.  Required, the configurations are laid out to fit into this budget.
     `worker_cost_to_spend` is used if it is not given.
@@ -238,7 +238,7 @@ scaling of parameters and data with the compute is written to the `summary` fold
 
 ## 4 Custom Optimizers
 
-To design entirely new optimizers, you can define them as class with a `__call__` method outside of AutoScAn and pass them to the `autoscan.run()` function:
+To design entirely new optimizers, you can define them as class with a `__call__` method outside of Extrapolaw and pass them to the `extrapolaw.run()` function:
 
 ```python
 @dataclass
@@ -257,10 +257,10 @@ class MyOptimizer:
         ...
 ```
 
-The class is then passed to the `autoscan.run()` function just like the built-in optimizers and can be configured the same way, using a dictionary:
+The class is then passed to the `extrapolaw.run()` function just like the built-in optimizers and can be configured the same way, using a dictionary:
 
 ```python
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -269,9 +269,9 @@ autoscan.run(
 )
 ```
 
-For more details on how to define a custom optimizer see the [Optimizer Interface][autoscan.optimizers.optimizer.AskFunction].
+For more details on how to define a custom optimizer see the [Optimizer Interface][extrapolaw.optimizers.optimizer.AskFunction].
 
-To receive the `cost_estimator` and `max_cost_per_config` given to `autoscan.run()`, like the [scaling optimizers](#3-scaling-optimizers), inherit from [`ScalingOptimizer`][autoscan.optimizers.optimizer.ScalingOptimizer]:
+To receive the `cost_estimator` and `max_cost_per_config` given to `extrapolaw.run()`, like the [scaling optimizers](#3-scaling-optimizers), inherit from [`ScalingOptimizer`][extrapolaw.optimizers.optimizer.ScalingOptimizer]:
 
 ```python
 class MyOptimizer(ScalingOptimizer):

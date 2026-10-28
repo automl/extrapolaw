@@ -41,7 +41,7 @@ authors:
     given-names: Frank
   - family-names: Stoll
     given-names: Danny
-title: "Automated Scaling Analysis (AutoScAn)"
+title: "Extrapolaw"
 version: 0.1.0
 date-released: 2026-10-10
-url: "https://github.com/automl/auto-scan"
+url: "https://github.com/automl/extrapolaw"

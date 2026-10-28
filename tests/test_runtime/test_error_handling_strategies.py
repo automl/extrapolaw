@@ -7,14 +7,14 @@ from pathlib import Path
 import pytest
 from pytest_cases import fixture, parametrize
 
-from autoscan.exceptions import WorkerRaiseError
-from autoscan.optimizers import OptimizerInfo
-from autoscan.optimizers.algorithms import random_search
-from autoscan.runtime import DefaultWorker
-from autoscan.space.autoscan_spaces.parameters import Float, PipelineSpace
-from autoscan.state import (
-    AutoScAnState,
+from extrapolaw.exceptions import WorkerRaiseError
+from extrapolaw.optimizers import OptimizerInfo
+from extrapolaw.optimizers.algorithms import random_search
+from extrapolaw.runtime import DefaultWorker
+from extrapolaw.space.extrapolaw_spaces.parameters import Float, PipelineSpace
+from extrapolaw.state import (
     DefaultReportValues,
+    ExtrapolawState,
     OnErrorPossibilities,
     OptimizationState,
     SeedSnapshot,
@@ -24,12 +24,12 @@ from autoscan.state import (
 
 
 @fixture
-def autoscan_state(tmp_path: Path) -> AutoScAnState:
+def extrapolaw_state(tmp_path: Path) -> ExtrapolawState:
     class TestSpace(PipelineSpace):
         a = Float(0, 1)
 
-    return AutoScAnState.create_or_load(
-        path=tmp_path / "autoscan_state",
+    return ExtrapolawState.create_or_load(
+        path=tmp_path / "extrapolaw_state",
         optimizer_info=OptimizerInfo(name="blah", info={"nothing": "here"}),
         optimizer_state=OptimizationState(
             budget=None,
@@ -45,7 +45,7 @@ def autoscan_state(tmp_path: Path) -> AutoScAnState:
     [OnErrorPossibilities.RAISE_ANY_ERROR, OnErrorPossibilities.RAISE_WORKER_ERROR],
 )
 def test_worker_raises_when_error_in_self(
-    autoscan_state: AutoScAnState,
+    extrapolaw_state: ExtrapolawState,
     on_error: OnErrorPossibilities,
 ) -> None:
     class TestSpace(PipelineSpace):
@@ -68,7 +68,7 @@ def test_worker_raises_when_error_in_self(
         raise ValueError("This is an error")
 
     worker = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=eval_function,
         settings=settings,
@@ -76,7 +76,7 @@ def test_worker_raises_when_error_in_self(
     with pytest.raises(WorkerRaiseError):
         worker.run()
 
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     n_crashed = sum(
         trial.metadata.state == Trial.State.CRASHED is not None
         for trial in trials.values()
@@ -84,11 +84,13 @@ def test_worker_raises_when_error_in_self(
     assert len(trials) == 1
     assert n_crashed == 1
 
-    assert autoscan_state.lock_and_get_next_pending_trial() is None
-    assert len(autoscan_state.lock_and_get_errors()) == 1
+    assert extrapolaw_state.lock_and_get_next_pending_trial() is None
+    assert len(extrapolaw_state.lock_and_get_errors()) == 1
 
 
-def test_worker_raises_when_error_in_other_worker(autoscan_state: AutoScAnState) -> None:
+def test_worker_raises_when_error_in_other_worker(
+    extrapolaw_state: ExtrapolawState,
+) -> None:
     class TestSpace(PipelineSpace):
         a = Float(0, 1)
 
@@ -109,13 +111,13 @@ def test_worker_raises_when_error_in_other_worker(autoscan_state: AutoScAnState)
         raise ValueError("This is an error")
 
     worker1 = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=evaler,
         settings=settings,
     )
     worker2 = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=evaler,
         settings=settings,
@@ -130,7 +132,7 @@ def test_worker_raises_when_error_in_other_worker(autoscan_state: AutoScAnState)
     with pytest.raises(WorkerRaiseError):
         worker2.run()
 
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     n_crashed = sum(
         trial.metadata.state == Trial.State.CRASHED is not None
         for trial in trials.values()
@@ -138,8 +140,8 @@ def test_worker_raises_when_error_in_other_worker(autoscan_state: AutoScAnState)
     assert len(trials) == 1
     assert n_crashed == 1
 
-    assert autoscan_state.lock_and_get_next_pending_trial() is None
-    assert len(autoscan_state.lock_and_get_errors()) == 1
+    assert extrapolaw_state.lock_and_get_next_pending_trial() is None
+    assert len(extrapolaw_state.lock_and_get_errors()) == 1
 
 
 @pytest.mark.parametrize(
@@ -147,7 +149,7 @@ def test_worker_raises_when_error_in_other_worker(autoscan_state: AutoScAnState)
     [OnErrorPossibilities.IGNORE, OnErrorPossibilities.RAISE_WORKER_ERROR],
 )
 def test_worker_does_not_raise_when_error_in_other_worker(
-    autoscan_state: AutoScAnState,
+    extrapolaw_state: ExtrapolawState,
     on_error: OnErrorPossibilities,
 ) -> None:
     class TestSpace(PipelineSpace):
@@ -178,13 +180,13 @@ def test_worker_does_not_raise_when_error_in_other_worker(
     evaler = _Eval(do_raise=True)
 
     worker1 = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=evaler,
         settings=settings,
     )
     worker2 = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=evaler,
         settings=settings,
@@ -195,7 +197,7 @@ def test_worker_does_not_raise_when_error_in_other_worker(
     with contextlib.suppress(WorkerRaiseError):
         worker1.run()
 
-    trials = list(autoscan_state.lock_and_read_trials().values())
+    trials = list(extrapolaw_state.lock_and_read_trials().values())
     assert (
         sum(1 for t in trials if t.metadata.evaluating_worker_id == worker1.worker_id)
         == 1
@@ -204,7 +206,7 @@ def test_worker_does_not_raise_when_error_in_other_worker(
     # Worker2 should run successfully
     evaler.do_raise = False
     worker2.run()
-    trials = list(autoscan_state.lock_and_read_trials().values())
+    trials = list(extrapolaw_state.lock_and_read_trials().values())
     assert (
         sum(1 for t in trials if t.metadata.evaluating_worker_id == worker2.worker_id)
         == 1
@@ -220,5 +222,5 @@ def test_worker_does_not_raise_when_error_in_other_worker(
     assert n_crashed == 1
     assert len(trials) == 2
 
-    assert autoscan_state.lock_and_get_next_pending_trial() is None
-    assert len(autoscan_state.lock_and_get_errors()) == 1
+    assert extrapolaw_state.lock_and_get_next_pending_trial() is None
+    assert len(extrapolaw_state.lock_and_get_errors()) == 1

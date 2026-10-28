@@ -12,9 +12,9 @@
 #     name: python3
 # ---
 
-# # Multi-Objective Optimization with AutoScAn
-# This tutorial covers a typical multi-objective optimization workflow with AutoScAn,
-# built around **PriMO**, AutoScAn's prior-informed multi-objective optimizer. We run
+# # Multi-Objective Optimization with Extrapolaw
+# This tutorial covers a typical multi-objective optimization workflow with Extrapolaw,
+# built around **PriMO**, Extrapolaw's prior-informed multi-objective optimizer. We run
 # it over a synthetic mathematical benchmark with expert priors layered on top. The
 # same principles carry over unchanged to real-world pipelines (e.g. minimizing
 # both validation loss and model size).
@@ -22,9 +22,9 @@
 # ## Installation and Setup
 
 
-# !git clone --depth 1 https://github.com/automl/auto-scan.git /content/autoscan
-# %cd /content/autoscan
-# !pip install -e /content/autoscan
+# !git clone --depth 1 https://github.com/automl/extrapolaw.git /content/extrapolaw
+# %cd /content/extrapolaw
+# !pip install -e /content/extrapolaw
 
 
 import functools
@@ -33,16 +33,16 @@ import logging
 import numpy as np
 import torch
 
-import autoscan
+import extrapolaw
 
 logging.basicConfig(level=logging.INFO)
 
 # ## What is Multi-Objective Optimization?
 # Instead of one scalar, `evaluate_pipeline` returns several — often conflicting —
 # objectives, and the optimizer searches for a *Pareto front*: configurations where
-# no objective can improve without worsening another. AutoScAn's built-in MO optimizers
+# no objective can improve without worsening another. Extrapolaw's built-in MO optimizers
 # are all bracket-based, like `asha`/`hyperband`, they require a
-# `autoscan.Fidelity` parameter in the search space. This tutorial focuses on `PriMO`,
+# `extrapolaw.Fidelity` parameter in the search space. This tutorial focuses on `PriMO`,
 # the recommended choice when you also have expert priors to inject.
 
 # ## The Optimization Task: ZDT1
@@ -64,7 +64,7 @@ def zdt1(x: list[float]) -> tuple[float, float]:
 # ## Setting Up the Search Space
 # The search space is `N_DIMS` independent floats plus a fidelity parameter —
 # PriMO reuses a multi-fidelity bracket internally, so the space needs a
-# `autoscan.Fidelity` parameter even though `N_DIMS` itself has nothing to do with
+# `extrapolaw.Fidelity` parameter even though `N_DIMS` itself has nothing to do with
 # fidelity. `evaluate_pipeline` returns a list of objectives instead of a single
 # float.
 
@@ -77,13 +77,13 @@ def zdt1_multi_fidelity(x: list[float], fidelity: int) -> tuple[float, float]:
     return f1, f2
 
 
-class ZDT1FidelitySpace(autoscan.PipelineSpace):
-    """ZDT1 with a fidelity parameter, required by every AutoScAn MO optimizer."""
+class ZDT1FidelitySpace(extrapolaw.PipelineSpace):
+    """ZDT1 with a fidelity parameter, required by every Extrapolaw MO optimizer."""
 
-    x0 = autoscan.Float(0.0, 1.0)
-    x1 = autoscan.Float(0.0, 1.0)
-    x2 = autoscan.Float(0.0, 1.0)
-    fidelity = autoscan.Fidelity(autoscan.Integer(1, MAX_FIDELITY))
+    x0 = extrapolaw.Float(0.0, 1.0)
+    x1 = extrapolaw.Float(0.0, 1.0)
+    x2 = extrapolaw.Float(0.0, 1.0)
+    fidelity = extrapolaw.Fidelity(extrapolaw.Integer(1, MAX_FIDELITY))
 
 
 def evaluate_pipeline(x0: float, x1: float, x2: float, fidelity: int) -> dict:
@@ -123,7 +123,7 @@ def build_primo_optimizer(prior_points: dict):
     prior_confidences = prior_points["prior_confidences"]
 
     return functools.partial(
-        autoscan.algorithms.primo,
+        extrapolaw.algorithms.primo,
         prior_centers=prior_centers,
         mo_selector="epsnet",
         prior_confidences=prior_confidences,
@@ -136,7 +136,7 @@ def build_primo_optimizer(prior_points: dict):
 
 # ### Run PriMO
 
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=evaluate_pipeline,
     root_directory="results_primo/",
     pipeline_space=ZDT1FidelitySpace(),
@@ -145,7 +145,7 @@ autoscan.run(
     overwrite_root_directory=True,
 )
 
-# !python -m autoscan.status results_primo/
+# !python -m extrapolaw.status results_primo/
 
 # PriMO starts with an MOASHA-driven initial design (`initial_design_size` full
 # fidelity-ladder sweeps), `moasha` is also available on its own as a
@@ -168,17 +168,17 @@ print(df[["objective_to_minimize"]].head())
 
 # ## Key Takeaways
 # 1. **Multiple objectives**: return a list under `objective_to_minimize` instead
-#    of a single float; AutoScAn then searches for a Pareto front, not one optimum.
+#    of a single float; Extrapolaw then searches for a Pareto front, not one optimum.
 # 2. **Fidelity is required for PriMO**: it reuses a multi-fidelity bracket
-#    internally, so the space needs a `autoscan.Fidelity` parameter even in an
+#    internally, so the space needs a `extrapolaw.Fidelity` parameter even in an
 #    otherwise flat search.
 # 3. **Priors are per-objective**: `prior_centers` / `prior_confidences` take one
 #    entry per objective (or per belief you want to express), each a full
 #    parameter -> value / parameter -> confidence mapping.
 
 # For more advanced examples:
-# - [Multi-Objective Example](https://github.com/automl/auto-scan/tree/master/autoscan_examples/efficiency)
-# - [Efficiency Techniques Tutorial](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/3_efficiency_techniques.ipynb)
-# - [Ask-and-Tell Interface](https://github.com/automl/auto-scan/tree/master/autoscan_examples/experimental)
+# - [Multi-Objective Example](https://github.com/automl/extrapolaw/tree/master/extrapolaw_examples/efficiency)
+# - [Efficiency Techniques Tutorial](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/3_efficiency_techniques.ipynb)
+# - [Ask-and-Tell Interface](https://github.com/automl/extrapolaw/tree/master/extrapolaw_examples/experimental)
 
-# If you want to contribute new techniques or optimizers, check out the contribution guide [here](https://automl.github.io/auto-scan/latest/dev_docs/contributing/).
+# If you want to contribute new techniques or optimizers, check out the contribution guide [here](https://automl.github.io/extrapolaw/latest/dev_docs/contributing/).

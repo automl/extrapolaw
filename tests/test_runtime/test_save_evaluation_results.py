@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 from pytest_cases import fixture
 
-from autoscan import Float, PipelineSpace, analyze, save_pipeline_results
-from autoscan.optimizers import OptimizerInfo
-from autoscan.optimizers.algorithms import random_search
-from autoscan.runtime import DefaultWorker
-from autoscan.state import (
-    AutoScAnState,
+from extrapolaw import Float, PipelineSpace, analyze, save_pipeline_results
+from extrapolaw.optimizers import OptimizerInfo
+from extrapolaw.optimizers.algorithms import random_search
+from extrapolaw.runtime import DefaultWorker
+from extrapolaw.state import (
     DefaultReportValues,
+    ExtrapolawState,
     OnErrorPossibilities,
     OptimizationState,
     SeedSnapshot,
@@ -21,9 +21,9 @@ from autoscan.state import (
 
 
 @fixture
-def autoscan_state(tmp_path: Path) -> AutoScAnState:
-    return AutoScAnState.create_or_load(
-        path=tmp_path / "autoscan_state",
+def extrapolaw_state(tmp_path: Path) -> ExtrapolawState:
+    return ExtrapolawState.create_or_load(
+        path=tmp_path / "extrapolaw_state",
         optimizer_info=OptimizerInfo(name="blah", info={"nothing": "here"}),
         optimizer_state=OptimizationState(
             budget=None, seed_snapshot=SeedSnapshot.new_capture(), shared_state={}
@@ -36,7 +36,7 @@ class ASpace(PipelineSpace):
     a = Float(0, 1)
 
 
-def test_async_happy_path_changes_state(autoscan_state: AutoScAnState) -> None:
+def test_async_happy_path_changes_state(extrapolaw_state: ExtrapolawState) -> None:
     optimizer = random_search(ASpace())
     settings = WorkerSettings(
         on_error=OnErrorPossibilities.IGNORE,
@@ -60,19 +60,19 @@ def test_async_happy_path_changes_state(autoscan_state: AutoScAnState) -> None:
             save_pipeline_results(
                 pipeline_id=pipeline_id,
                 user_result=user_result,
-                root_directory=Path(autoscan_state.path),
+                root_directory=Path(extrapolaw_state.path),
             )
 
         callback_holder.append(async_save)
 
     DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=async_eval_fn,
         settings=settings,
     ).run()
 
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     assert len(trials) == 2
     for trial in trials.values():
         assert trial.metadata.state == Trial.State.EVALUATING
@@ -80,7 +80,7 @@ def test_async_happy_path_changes_state(autoscan_state: AutoScAnState) -> None:
 
     result_dict = {"objective_to_minimize": 0.3, "cost": 1.2}
     callback_holder[0](result_dict)
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     trial_iter = iter(trials.values())
     trial_after = next(trial_iter)
     assert trial_after.metadata.state == Trial.State.SUCCESS
@@ -93,14 +93,14 @@ def test_async_happy_path_changes_state(autoscan_state: AutoScAnState) -> None:
 
     result_dict = {"objective_to_minimize": 10}  # cost not provided
     callback_holder[1](result_dict)
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     trial_after = list(trials.values())[1]
     assert trial_after.metadata.state == Trial.State.SUCCESS
     assert trial_after.report.objective_to_minimize == 10
     assert trial_after.report.cost is None  # default is always None
 
 
-def test_async_save_updates_the_whole_summary(autoscan_state: AutoScAnState) -> None:
+def test_async_save_updates_the_whole_summary(extrapolaw_state: ExtrapolawState) -> None:
     """The detached path writes the same summary artifacts as the worker loop,
     not only the CSVs.
     """
@@ -124,19 +124,19 @@ def test_async_save_updates_the_whole_summary(autoscan_state: AutoScAnState) -> 
             save_pipeline_results(
                 pipeline_id=pipeline_id,
                 user_result=user_result,
-                root_directory=Path(autoscan_state.path),
+                root_directory=Path(extrapolaw_state.path),
             )
 
         callback_holder.append(async_save)
 
     DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=async_eval_fn,
         settings=settings,
     ).run()
 
-    summary_dir = Path(autoscan_state.path) / "summary"
+    summary_dir = Path(extrapolaw_state.path) / "summary"
     assert (summary_dir / "best_config.txt").read_text() == ""
 
     callback_holder[0]({"objective_to_minimize": 0.3, "cost": 1.2})
@@ -147,7 +147,7 @@ def test_async_save_updates_the_whole_summary(autoscan_state: AutoScAnState) -> 
     assert "best_objective_to_minimize" in (summary_dir / "short.csv").read_text()
 
 
-def test_analyze_rebuilds_the_summary(autoscan_state: AutoScAnState) -> None:
+def test_analyze_rebuilds_the_summary(extrapolaw_state: ExtrapolawState) -> None:
     """`analyze` rebuilds the whole summary folder, plots included, from disk."""
     settings = WorkerSettings(
         on_error=OnErrorPossibilities.IGNORE,
@@ -162,17 +162,17 @@ def test_analyze_rebuilds_the_summary(autoscan_state: AutoScAnState) -> None:
     )
 
     DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=random_search(ASpace()),
         evaluation_fn=lambda *_, **__: 0.5,
         settings=settings,
     ).run()
 
-    summary_dir = Path(autoscan_state.path) / "summary"
+    summary_dir = Path(extrapolaw_state.path) / "summary"
     for file in summary_dir.iterdir():
         file.unlink()
 
-    analyze(autoscan_state.path)
+    analyze(extrapolaw_state.path)
 
     assert "Config ID:" in (summary_dir / "best_config.txt").read_text()
     assert "Final cumulative metrics" in (summary_dir / "best_config.txt").read_text()

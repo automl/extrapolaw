@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from pytest_cases import parametrize
 
-from autoscan.sampling import (
+from extrapolaw.sampling import (
     BorderSampler,
     Prior,
     Sampler,
@@ -11,7 +11,7 @@ from autoscan.sampling import (
     Uniform,
     WeightedSampler,
 )
-from autoscan.space import Domain
+from extrapolaw.space import Domain
 
 
 def _make_centered_prior(ndim: int) -> Prior:
