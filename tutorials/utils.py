@@ -18,8 +18,7 @@ MNIST_STD = 0.3081
 
 
 def set_seeds(seed: int) -> None:
-    """Set seeds for reproducibility.
-    """
+    """Set seeds for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -31,9 +30,9 @@ def set_seeds(seed: int) -> None:
 
 
 def prepare_mnist_dataloader(
-    batch_size: int=64,
-    val_fraction: float=0.25,
-    subsample_fraction: float=1.0,
+    batch_size: int = 64,
+    val_fraction: float = 0.25,
+    subsample_fraction: float = 1.0,
 ) -> Tuple[DataLoader, DataLoader, Tuple[int, int, int], int]:
     """Prepare MNIST dataloader.
 
@@ -81,17 +80,24 @@ def prepare_mnist_dataloader(
     # Number of classes in the dataset
     num_classes = len(dataset.classes)
 
-    return train_loader, val_loader, (num_channels, image_height, image_width), num_classes
+    return (
+        train_loader,
+        val_loader,
+        (num_channels, image_height, image_width),
+        num_classes,
+    )
 
 
-def load_autoscan_checkpoint(
-        previous_pipeline_directory: Path,
-        model: nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
-    ) -> Tuple[int, nn.Module, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler | None]:
-    """Load checkpoint state to be used by AutoScAn.
-    
+def load_extrapolaw_checkpoint(
+    previous_pipeline_directory: Path,
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
+) -> Tuple[
+    int, nn.Module, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler | None
+]:
+    """Load checkpoint state to be used by Extrapolaw.
+
     Args:
         previous_pipeline_directory (Path): Directory where checkpoint is saved.
         model (nn.Module): Model to be loaded.
@@ -106,7 +112,9 @@ def load_autoscan_checkpoint(
     """
     steps = None
     if previous_pipeline_directory is not None:
-        checkpoint = torch.load(previous_pipeline_directory / "checkpoint.pth", weights_only=False)
+        checkpoint = torch.load(
+            previous_pipeline_directory / "checkpoint.pth", weights_only=False
+        )
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         if scheduler is not None and "scheduler_state_dict" in checkpoint:
@@ -124,15 +132,15 @@ def load_autoscan_checkpoint(
     return steps, model, optimizer, scheduler
 
 
-def save_autoscan_checkpoint(
+def save_extrapolaw_checkpoint(
     pipeline_directory: Path,
     epoch: int,
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
 ) -> None:
-    """Save checkpoint state to be used by AutoScAn.
-    
+    """Save checkpoint state to be used by Extrapolaw.
+
     Args:
         pipeline_directory (Path): Directory where checkpoint is saved.
         epoch (int): Number of steps the model was trained for.
@@ -156,7 +164,7 @@ def save_autoscan_checkpoint(
     )
 
 
-def display_images(dataloader: DataLoader, num_images: int=5):
+def display_images(dataloader: DataLoader, num_images: int = 5):
     """Display random images from a PyTorch DataLoader.
 
     Args:
@@ -170,7 +178,7 @@ def display_images(dataloader: DataLoader, num_images: int=5):
     indices = np.random.choice(len(images), size=num_images, replace=False)
 
     # Display the images
-    fig, axs = plt.subplots(1, num_images, figsize=(5*num_images, 5))
+    fig, axs = plt.subplots(1, num_images, figsize=(5 * num_images, 5))
     for i, idx in enumerate(indices):
         # Un-normalize the image
         image = images[idx].numpy() * MNIST_STD + MNIST_MEAN
@@ -180,26 +188,34 @@ def display_images(dataloader: DataLoader, num_images: int=5):
 
         # Display the image
         if num_images > 1:
-            axs[i].imshow(image.squeeze(), cmap='gray')
-            axs[i].set_title(f'Label: {labels[idx].item()}')
-            axs[i].axis('off')  # Hide the axes
+            axs[i].imshow(image.squeeze(), cmap="gray")
+            axs[i].set_title(f"Label: {labels[idx].item()}")
+            axs[i].axis("off")  # Hide the axes
         else:
-            axs.imshow(image.squeeze(), cmap='gray')
-            axs.set_title(f'Label: {labels[idx].item()}')
-            axs.axis('off')  # Hide the axes
+            axs.imshow(image.squeeze(), cmap="gray")
+            axs.set_title(f"Label: {labels[idx].item()}")
+            axs.axis("off")  # Hide the axes
 
     # Show the plot
     plt.show()
 
 
-def get_optimizer(optimizer: str, model: nn.Module, learning_rate: float, weight_decay: float):
+def get_optimizer(
+    optimizer: str, model: nn.Module, learning_rate: float, weight_decay: float
+):
     optimizer_name = optimizer
     if optimizer == "adam":
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        optimizer = optim.Adam(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
     elif optimizer == "adamw":
-        optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        optimizer = optim.AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
     elif optimizer == "sgd":
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        optimizer = optim.SGD(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
     else:
         raise KeyError(f"optimizer {optimizer} is not available")
     return optimizer
@@ -227,8 +243,10 @@ def train_one_epoch(
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
     scheduler=None,
-    device: str = "cpu"
-) -> Tuple[nn.Module, optim.Optimizer, Union[torch.optim.lr_scheduler.LRScheduler, None], float]:
+    device: str = "cpu",
+) -> Tuple[
+    nn.Module, optim.Optimizer, Union[torch.optim.lr_scheduler.LRScheduler, None], float
+]:
     loss_per_batch = []
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -246,10 +264,7 @@ def train_one_epoch(
 
 
 def validate_model(
-    model: nn.Module,
-    val_loader: DataLoader,
-    loss_fn: nn.Module,
-    device: str = "cpu"
+    model: nn.Module, val_loader: DataLoader, loss_fn: nn.Module, device: str = "cpu"
 ) -> Tuple[float, float]:
     model.eval()
     val_loss = 0

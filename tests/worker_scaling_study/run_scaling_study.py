@@ -1,4 +1,4 @@
-"""Submits one Slurm job per `autoscan.run` worker, for each worker count of the study.
+"""Submits one Slurm job per `extrapolaw.run` worker, for each worker count of the study.
 Every worker gets its own 1-GPU allocation; the workers of a setting share a root
 directory.
 """
@@ -29,22 +29,22 @@ ROOT_DIRECTORY = SOURCE_DIR.parent / "results" / "scaling_study"
 
 
 def root_dir_for(n_workers: int) -> Path:
-    """Where one setting's workers share their AutoScAn state. AutoScAn owns this path."""
+    """Where one setting's workers share their Extrapolaw state, owned by Extrapolaw."""
     return ROOT_DIRECTORY / f"workers_{n_workers}"
 
 
 def job_dir_for(n_workers: int) -> Path:
-    """Where one setting's job scripts and Slurm logs live, outside its AutoScAn state."""
+    """Where one setting's job scripts and Slurm logs live, outside Extrapolaw state."""
     return ROOT_DIRECTORY / "jobs" / f"workers_{n_workers}"
 
 
 def write_job_script(n_workers: int, worker_index: int) -> Path:
-    """The sbatch script for a single worker: one `autoscan.run` on one GPU."""
+    """The sbatch script for a single worker: one `extrapolaw.run` on one GPU."""
     job_dir = job_dir_for(n_workers)
     job_dir.mkdir(parents=True, exist_ok=True)
 
-    # Only the first worker of a setting creates the AutoScAn state; the rest wait
-    # for it, since `AutoScAnState.create_or_load` does not lock its creation path.
+    # Only the first worker of a setting creates the Extrapolaw state; the rest wait
+    # for it, since `ExtrapolawState.create_or_load` does not lock its creation path.
     wait_flag = " --wait_for_state" if worker_index > 0 else ""
 
     script = f"""#!/bin/bash

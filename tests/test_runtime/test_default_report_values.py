@@ -4,13 +4,13 @@ from pathlib import Path
 
 from pytest_cases import fixture
 
-from autoscan.optimizers import OptimizerInfo
-from autoscan.optimizers.algorithms import random_search
-from autoscan.runtime import DefaultWorker
-from autoscan.space.autoscan_spaces.parameters import Float, PipelineSpace
-from autoscan.state import (
-    AutoScAnState,
+from extrapolaw.optimizers import OptimizerInfo
+from extrapolaw.optimizers.algorithms import random_search
+from extrapolaw.runtime import DefaultWorker
+from extrapolaw.space.extrapolaw_spaces.parameters import Float, PipelineSpace
+from extrapolaw.state import (
     DefaultReportValues,
+    ExtrapolawState,
     OnErrorPossibilities,
     OptimizationState,
     SeedSnapshot,
@@ -20,12 +20,12 @@ from autoscan.state import (
 
 
 @fixture
-def autoscan_state(tmp_path: Path) -> AutoScAnState:
+def extrapolaw_state(tmp_path: Path) -> ExtrapolawState:
     class TestSpace(PipelineSpace):
         a = Float(0, 1)
 
-    return AutoScAnState.create_or_load(
-        path=tmp_path / "autoscan_state",
+    return ExtrapolawState.create_or_load(
+        path=tmp_path / "extrapolaw_state",
         optimizer_info=OptimizerInfo(name="blah", info={"nothing": "here"}),
         optimizer_state=OptimizationState(
             budget=None, seed_snapshot=SeedSnapshot.new_capture(), shared_state={}
@@ -35,7 +35,7 @@ def autoscan_state(tmp_path: Path) -> AutoScAnState:
 
 
 def test_default_values_on_error(
-    autoscan_state: AutoScAnState,
+    extrapolaw_state: ExtrapolawState,
 ) -> None:
     class TestSpace(PipelineSpace):
         a = Float(0, 1)
@@ -61,14 +61,14 @@ def test_default_values_on_error(
         raise ValueError("This is an error")
 
     worker = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=eval_function,
         settings=settings,
     )
     worker.run()
 
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     n_crashed = sum(
         trial.metadata.state == Trial.State.CRASHED is not None
         for trial in trials.values()
@@ -76,8 +76,8 @@ def test_default_values_on_error(
     assert len(trials) == 1
     assert n_crashed == 1
 
-    assert autoscan_state.lock_and_get_next_pending_trial() is None
-    assert len(autoscan_state.lock_and_get_errors()) == 1
+    assert extrapolaw_state.lock_and_get_next_pending_trial() is None
+    assert len(extrapolaw_state.lock_and_get_errors()) == 1
 
     trial = trials.popitem()[1]
     assert trial.metadata.state == Trial.State.CRASHED
@@ -88,7 +88,7 @@ def test_default_values_on_error(
 
 
 def test_default_values_on_not_specified(
-    autoscan_state: AutoScAnState,
+    extrapolaw_state: ExtrapolawState,
 ) -> None:
     class TestSpace(PipelineSpace):
         a = Float(0, 1)
@@ -113,14 +113,14 @@ def test_default_values_on_not_specified(
         return 1.0
 
     worker = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=eval_function,
         settings=settings,
     )
     worker.run()
 
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     n_sucess = sum(
         trial.metadata.state == Trial.State.SUCCESS is not None
         for trial in trials.values()
@@ -128,8 +128,8 @@ def test_default_values_on_not_specified(
     assert len(trials) == 1
     assert n_sucess == 1
 
-    assert autoscan_state.lock_and_get_next_pending_trial() is None
-    assert len(autoscan_state.lock_and_get_errors()) == 0
+    assert extrapolaw_state.lock_and_get_next_pending_trial() is None
+    assert len(extrapolaw_state.lock_and_get_errors()) == 0
 
     trial = trials.popitem()[1]
     assert trial.metadata.state == Trial.State.SUCCESS
@@ -139,7 +139,7 @@ def test_default_values_on_not_specified(
 
 
 def test_default_value_objective_to_minimize_curve_take_objective_to_minimize_value(
-    autoscan_state: AutoScAnState,
+    extrapolaw_state: ExtrapolawState,
 ) -> None:
     class TestSpace(PipelineSpace):
         a = Float(0, 1)
@@ -165,14 +165,14 @@ def test_default_value_objective_to_minimize_curve_take_objective_to_minimize_va
         return LOSS
 
     worker = DefaultWorker.new(
-        state=autoscan_state,
+        state=extrapolaw_state,
         optimizer=optimizer,
         evaluation_fn=eval_function,
         settings=settings,
     )
     worker.run()
 
-    trials = autoscan_state.lock_and_read_trials()
+    trials = extrapolaw_state.lock_and_read_trials()
     n_sucess = sum(
         trial.metadata.state == Trial.State.SUCCESS is not None
         for trial in trials.values()
@@ -180,8 +180,8 @@ def test_default_value_objective_to_minimize_curve_take_objective_to_minimize_va
     assert len(trials) == 1
     assert n_sucess == 1
 
-    assert autoscan_state.lock_and_get_next_pending_trial() is None
-    assert len(autoscan_state.lock_and_get_errors()) == 0
+    assert extrapolaw_state.lock_and_get_next_pending_trial() is None
+    assert len(extrapolaw_state.lock_and_get_errors()) == 0
 
     trial = trials.popitem()[1]
     assert trial.metadata.state == Trial.State.SUCCESS

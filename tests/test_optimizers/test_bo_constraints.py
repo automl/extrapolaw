@@ -5,23 +5,23 @@ import time
 import pytest
 import torch
 
-from autoscan.optimizers.algorithms import bayesian_optimization
-from autoscan.optimizers.models.gp import (
+from extrapolaw.optimizers.algorithms import bayesian_optimization
+from extrapolaw.optimizers.models.gp import (
     INFEASIBLE_CONSTRAINT_VALUE,
     encode_constraints_func,
     make_ic_generator,
 )
-from autoscan.optimizers.optimizer import SampledConfig
-from autoscan.optimizers.utils.initial_design import make_initial_design
-from autoscan.space import (
+from extrapolaw.optimizers.optimizer import SampledConfig
+from extrapolaw.optimizers.utils.initial_design import make_initial_design
+from extrapolaw.space import (
     HPOCategorical,
     HPOConstant,
     HPOFloat,
     HPOInteger,
     SearchSpace,
 )
-from autoscan.space.encoding import ConfigEncoder
-from autoscan.state import Trial
+from extrapolaw.space.encoding import ConfigEncoder
+from extrapolaw.state import Trial
 
 
 def _trial(sampled: SampledConfig, objective: float) -> Trial:

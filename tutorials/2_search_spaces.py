@@ -12,93 +12,103 @@
 #     name: python3
 # ---
 
-# # Defining Search Spaces in AutoScAn
+# # Defining Search Spaces in Extrapolaw
 # This tutorial covers the different parameter types and how to define expressive search spaces for your optimization problems.
 
 # ## Installation and Setup
 
 
-# !git clone --depth 1 https://github.com/automl/auto-scan.git /content/autoscan
-# %cd /content/autoscan
-# !pip install -e /content/autoscan
+# !git clone --depth 1 https://github.com/automl/extrapolaw.git /content/extrapolaw
+# %cd /content/extrapolaw
+# !pip install -e /content/extrapolaw
 
 
-import autoscan
+import extrapolaw
 import logging
 
 # ## Parameter Types
-# AutoScAn supports several parameter types for defining your search space.
+# Extrapolaw supports several parameter types for defining your search space.
 
 # ### 1. Float Parameters
 # Continuous parameters with optional log scaling.
 
 # Linear scale
-learning_rate_linear = autoscan.Float(lower=0.0001, upper=0.1)
+learning_rate_linear = extrapolaw.Float(lower=0.0001, upper=0.1)
 # Log scale (useful for learning rates, regularization)
-learning_rate_log = autoscan.Float(lower=1e-6, upper=1e-1, log=True)
+learning_rate_log = extrapolaw.Float(lower=1e-6, upper=1e-1, log=True)
 # With prior value
-dropout_rate = autoscan.Float(lower=0.0, upper=0.9, prior=0.5, prior_confidence="medium")
+dropout_rate = extrapolaw.Float(
+    lower=0.0, upper=0.9, prior=0.5, prior_confidence="medium"
+)
 
 # ### 2. Integer Parameters
 # Discrete integer parameters.
 
 # Basic integer
-num_layers = autoscan.Integer(lower=1, upper=10)
+num_layers = extrapolaw.Integer(lower=1, upper=10)
 # With prior value
-batch_size = autoscan.Integer(lower=16, upper=256, prior=64, prior_confidence="medium")
+batch_size = extrapolaw.Integer(lower=16, upper=256, prior=64, prior_confidence="medium")
 # With log scale
-hidden_units = autoscan.Integer(lower=32, upper=2048, log=True)
+hidden_units = extrapolaw.Integer(lower=32, upper=2048, log=True)
 
 # ### 3. Categorical Parameters
 # Discrete choices with optional ordering.
 
 # Basic categorical
-optimizer = autoscan.Categorical(choices=["sgd", "adam", "adamw"])
+optimizer = extrapolaw.Categorical(choices=["sgd", "adam", "adamw"])
 # With prior value
-activation = autoscan.Categorical(
+activation = extrapolaw.Categorical(
     choices=["relu", "tanh", "sigmoid"],
     prior=0,  # Index of default choice (relu)
-    prior_confidence="high"
+    prior_confidence="high",
 )
 
 # ## Building Complex Search Spaces
 
 # ### The PipelineSpace Class
 
-class MyOptimizationSpace(autoscan.PipelineSpace):
+
+class MyOptimizationSpace(extrapolaw.PipelineSpace):
     """Define a structured search space for neural architecture search."""
 
     # Architecture parameters
-    num_layers = autoscan.Integer(lower=2, upper=6, prior=3, prior_confidence="medium")
-    num_neurons = autoscan.Integer(lower=64, upper=512, log=True, prior=256, prior_confidence="medium")
-    activation = autoscan.Categorical(
-        choices=["relu", "elu", "gelu"],
-        prior=0,
-        prior_confidence="medium"
+    num_layers = extrapolaw.Integer(lower=2, upper=6, prior=3, prior_confidence="medium")
+    num_neurons = extrapolaw.Integer(
+        lower=64, upper=512, log=True, prior=256, prior_confidence="medium"
+    )
+    activation = extrapolaw.Categorical(
+        choices=["relu", "elu", "gelu"], prior=0, prior_confidence="medium"
     )
 
     # Training hyperparameters
-    learning_rate = autoscan.Float(lower=1e-6, upper=1e-1, log=True, prior=1e-3, prior_confidence="medium")
-    optimizer = autoscan.Categorical(
-        choices=["sgd", "adam", "adamw"],
-        prior=1,
-        prior_confidence="high"
+    learning_rate = extrapolaw.Float(
+        lower=1e-6, upper=1e-1, log=True, prior=1e-3, prior_confidence="medium"
+    )
+    optimizer = extrapolaw.Categorical(
+        choices=["sgd", "adam", "adamw"], prior=1, prior_confidence="high"
     )
 
     # Regularization
-    dropout_rate = autoscan.Float(lower=0.0, upper=0.9, prior=0.1, prior_confidence="medium")
-    weight_decay = autoscan.Float(lower=0.0, upper=1e-2, log=True, prior=1e-4, prior_confidence="medium")
+    dropout_rate = extrapolaw.Float(
+        lower=0.0, upper=0.9, prior=0.1, prior_confidence="medium"
+    )
+    weight_decay = extrapolaw.Float(
+        lower=0.0, upper=1e-2, log=True, prior=1e-4, prior_confidence="medium"
+    )
+
 
 # ## Fidelity Parameters
 
 # Use fidelity parameters for multi-fidelity optimization (train with different epochs, dataset sizes, etc.).
 
+
 # Define a search space with a fidelity parameter
-class FidelitySpace(autoscan.PipelineSpace):
-    learning_rate=autoscan.Float(1e-6, 1e-1, log=True)
-    optimizer=autoscan.Categorical(["sgd", "adam"])
+class FidelitySpace(extrapolaw.PipelineSpace):
+    learning_rate = extrapolaw.Float(1e-6, 1e-1, log=True)
+    optimizer = extrapolaw.Categorical(["sgd", "adam"])
     # Fidelity: Use IntegerFidelity or FloatFidelity for multi-fidelity optimization
-    epochs=autoscan.IntegerFidelity(1, 10)
+    epochs = extrapolaw.IntegerFidelity(1, 10)
+
 
 # ## Important: Constraint-Free Search Spaces
 #
@@ -108,8 +118,8 @@ class FidelitySpace(autoscan.PipelineSpace):
 # **Bad Example: Constrained search space**
 # If there's an implicit constraint like `max_units % max_layers = 0 and max_units <= 8 * max_layers`:
 # ```python
-# max_layers = autoscan.Integer(1, 10)
-# max_units = autoscan.Integer(64, 1024)
+# max_layers = extrapolaw.Integer(1, 10)
+# max_units = extrapolaw.Integer(64, 1024)
 # # Problem: Not all combinations are valid! The optimizer might waste time exploring
 # # configurations that violate the implicit constraint.
 # ```
@@ -117,8 +127,8 @@ class FidelitySpace(autoscan.PipelineSpace):
 # **Good Example: Constraint-free search space**
 # Refactor to use independent dimensions:
 # ```python
-# max_layers = autoscan.Integer(1, 10)
-# units_per_layer = autoscan.Integer(1, 8)  # Independent of max_layers
+# max_layers = extrapolaw.Integer(1, 10)
+# units_per_layer = extrapolaw.Integer(1, 8)  # Independent of max_layers
 # # Now all combinations are valid and the optimizer can search freely!
 # ```
 #
@@ -135,6 +145,7 @@ class FidelitySpace(autoscan.PipelineSpace):
 #
 # The important pattern is to define a reusable search grammar and call `.resample()`
 # when the same grammar should be sampled independently in multiple places.
+
 
 # Constructors for the conditional parts of the pipeline. In a real project these
 # would create layers, modules, preprocessing steps, or optimizer objects.
@@ -162,7 +173,7 @@ def make_pipeline(*blocks: dict, learning_rate: float, optimizer: str) -> dict:
     }
 
 
-class ConditionalPipelineSpace(autoscan.PipelineSpace):
+class ConditionalPipelineSpace(extrapolaw.PipelineSpace):
     """Build a variable pipeline from independently sampled conditional blocks.
 
     Each block independently chooses between a dense and convolutional branch. The
@@ -170,31 +181,31 @@ class ConditionalPipelineSpace(autoscan.PipelineSpace):
     the final evaluation receives the constructed pipeline object.
     """
 
-    _dense_layer = autoscan.Operation(
+    _dense_layer = extrapolaw.Operation(
         operator=dense_layer,
         kwargs={
-            "num_neurons": autoscan.Integer(64, 512, log=True).resample(),
-            "activation": autoscan.Categorical(["relu", "gelu", "elu"]).resample(),
+            "num_neurons": extrapolaw.Integer(64, 512, log=True).resample(),
+            "activation": extrapolaw.Categorical(["relu", "gelu", "elu"]).resample(),
         },
     )
-    _conv_layer = autoscan.Operation(
+    _conv_layer = extrapolaw.Operation(
         operator=conv_layer,
         kwargs={
-            "num_filters": autoscan.Integer(16, 128, log=True).resample(),
-            "kernel_size": autoscan.Categorical([3, 5, 7]).resample(),
+            "num_filters": extrapolaw.Integer(16, 128, log=True).resample(),
+            "kernel_size": extrapolaw.Categorical([3, 5, 7]).resample(),
         },
     )
 
-    _block = autoscan.Categorical(
+    _block = extrapolaw.Categorical(
         choices=(
             _dense_layer.resample(),
             _conv_layer.resample(),
         ),
     )
-    _learning_rate = autoscan.Float(1e-5, 1e-2, log=True)
-    _optimizer = autoscan.Categorical(["adam", "adamw", "sgd"])
+    _learning_rate = extrapolaw.Float(1e-5, 1e-2, log=True)
+    _optimizer = extrapolaw.Categorical(["adam", "adamw", "sgd"])
 
-    pipeline = autoscan.Operation(
+    pipeline = extrapolaw.Operation(
         operator=make_pipeline,
         args=(
             _block.resample(),
@@ -226,7 +237,7 @@ def evaluate_conditional_pipeline(pipeline: dict) -> float:
 
 
 conditional_space = ConditionalPipelineSpace()
-autoscan.run(
+extrapolaw.run(
     evaluate_pipeline=evaluate_conditional_pipeline,
     pipeline_space=conditional_space,
     root_directory="conditional_search_space_example/",
@@ -244,7 +255,7 @@ autoscan.run(
 # - **Float**: For continuous parameters, use `log=True` for log-scaled distributions
 # - **Integer**: For discrete counts, also supports `log=True` for exponential spacing
 # - **Categorical**: For discrete choices between multiple options
-# - **Fidelity**: Use `autoscan.IntegerFidelity()` and `autoscan.FloatFidelity()` for multi-fidelity optimization
+# - **Fidelity**: Use `extrapolaw.IntegerFidelity()` and `extrapolaw.FloatFidelity()` for multi-fidelity optimization
 # - **PipelineSpace**: Use class-based spaces for better organization in large search spaces
 # - **Priors**: Use `prior` and `prior_confidence` to incorporate domain knowledge
 #
@@ -253,7 +264,7 @@ autoscan.run(
 # refactor the space to use independent dimensions (e.g., units_per_layer and max_layers).
 # Constraints between hyperparameters can confuse optimization algorithms and reduce efficiency.
 #
-# For more details, see the [AutoScAn Documentation](https://automl.github.io/auto-scan/latest/reference/autoscan_spaces/).
+# For more details, see the [Extrapolaw Documentation](https://automl.github.io/extrapolaw/latest/reference/extrapolaw_spaces/).
 
 # Next steps:
-# - Explore [**Efficiency Techniques**](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/3_efficiency_techniques.ipynb) like multi-fidelity optimization.
+# - Explore [**Efficiency Techniques**](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/3_efficiency_techniques.ipynb) like multi-fidelity optimization.

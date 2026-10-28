@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from autoscan.state import Trial
+from extrapolaw.state import Trial
 
 
 def test_trial_creation() -> None:

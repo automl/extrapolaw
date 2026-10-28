@@ -27,7 +27,7 @@ site/*
 
 # Results
 results
-autoscan_examples/results
+extrapolaw_examples/results
 tests_tmpdir
 usage_example
 lightning_logs

@@ -1,18 +1,18 @@
-# Automated Scaling Analysis (AutoScAn)
+# Extrapolaw
 
-[![PyPI version](https://img.shields.io/pypi/v/auto-scan?color=informational)](https://pypi.org/project/auto-scan/)
-[![Python versions](https://img.shields.io/pypi/pyversions/auto-scan)](https://pypi.org/project/auto-scan/)
-[![License](https://img.shields.io/pypi/l/auto-scan?color=informational)](LICENSE)
-[![Tests](https://github.com/automl/auto-scan/actions/workflows/tests.yaml/badge.svg)](https://github.com/automl/auto-scan/actions)
+[![PyPI version](https://img.shields.io/pypi/v/extrapolaw?color=informational)](https://pypi.org/project/extrapolaw/)
+[![Python versions](https://img.shields.io/pypi/pyversions/extrapolaw)](https://pypi.org/project/extrapolaw/)
+[![License](https://img.shields.io/pypi/l/extrapolaw?color=informational)](LICENSE)
+[![Tests](https://github.com/automl/extrapolaw/actions/workflows/tests.yaml/badge.svg)](https://github.com/automl/extrapolaw/actions)
 
-AutoScAn (Automated Scaling Analysis) is a tool for finding the best architectural and hyperparameter choices of deep learning pipelines, and for analysing how those choices behave as you scale models, data, and compute.
+Extrapolaw is a tool for finding the best architectural and hyperparameter choices of deep learning pipelines, and for analysing how those choices behave as you scale models, data, and compute.
 Use it for hyperparameter optimization (HPO), neural architecture search (NAS), or any other design choice in your pipeline, from a single GPU to a multi-node cluster or even multiple clusters.
 
-AutoScAn brings together [years of our algorithmic advances](https://github.com/automl/auto-scan/blob/master/docs/citations.md) (e.g., in NeurIPS, ICML, or ICLR) with a runtime tailored to large scale models. AutoScAn is actively maintained and used to run on many different clusters, tuning even billion-parameter scale models with many concurrent trials.
+Extrapolaw brings together [years of our algorithmic advances](https://github.com/automl/extrapolaw/blob/master/docs/citations.md) (e.g., in NeurIPS, ICML, or ICLR) with a runtime tailored to large scale models. Extrapolaw is actively maintained and used to run on many different clusters, tuning even billion-parameter scale models with many concurrent trials.
 
-To learn about AutoScAn, check out [the documentation](https://automl.github.io/auto-scan/latest/), [our examples](autoscan_examples/), or our [Colab tutorials](#tutorials).
+To learn about Extrapolaw, check out [the documentation](https://automl.github.io/extrapolaw/latest/), [our examples](extrapolaw_examples/), or our [Colab tutorials](#tutorials).
 
-## Why AutoScAn
+## Why Extrapolaw
 
 ### Scaling laws built in
 
@@ -21,16 +21,16 @@ To learn about AutoScAn, check out [the documentation](https://automl.github.io/
 
 ### Tailored to large scale models
 
-- **Tuning distributed models:** AutoScAn works with [DDP](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) and [FSDP](https://docs.pytorch.org/tutorials/intermediate/FSDP1_tutorial.html), on a single node or across multiple nodes, out of the box ([examples](autoscan_examples/efficiency/)).
+- **Tuning distributed models:** Extrapolaw works with [DDP](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) and [FSDP](https://docs.pytorch.org/tutorials/intermediate/FSDP1_tutorial.html), on a single node or across multiple nodes, out of the box ([examples](extrapolaw_examples/efficiency/)).
 - **Zero-effort to run many concurrent models:** start more workers on the same machine or in a multi-node setup. As long as they share the results directory, they coordinate on their own, with no server to set up.
-- **Live monitoring and interventions:** follow a run with `autoscan.status`, live plots, or [TensorBoard](https://automl.github.io/auto-scan/latest/reference/analyse/#visualizing-results), and steer it without starting over: add workers, extend the budget, re-run failed trials, or import tuning results from anywhere (even cross-cluster).
+- **Live monitoring and interventions:** follow a run with `extrapolaw.status`, live plots, or [TensorBoard](https://automl.github.io/extrapolaw/latest/reference/analyse/#visualizing-results), and steer it without starting over: add workers, extend the budget, re-run failed trials, or import tuning results from anywhere (even cross-cluster).
 
 ### Efficient tuning algorithms
 
 - **Low-fidelity evaluations:** principled use of cheap evaluations, such as fewer epochs or less data, to rule out bad configurations early.
 - **Expert knowledge and prior studies:** use your intuition as priors, and results from earlier studies, when you have them.
 - **Model-based search:** strategies such as Bayesian optimization choose promising configurations smartly instead of sampling blindly.
-- **[Scaling optimizers](https://automl.github.io/auto-scan/latest/reference/optimizers/#3-scaling-optimizers):** grounded scaling-law prescriptions, adapted to budget-aware search.
+- **[Scaling optimizers](https://automl.github.io/extrapolaw/latest/reference/optimizers/#3-scaling-optimizers):** grounded scaling-law prescriptions, adapted to budget-aware search.
 
 ### Generally applicable
 
@@ -40,25 +40,25 @@ To learn about AutoScAn, check out [the documentation](https://automl.github.io/
 
 ## Installation
 
-AutoScAn supports Python 3.11 to 3.14. Install the latest release from PyPI:
+Extrapolaw supports Python 3.11 to 3.14. Install the latest release from PyPI:
 
 ```bash
-pip install auto-scan
+pip install extrapolaw
 ```
 
 ## Basic Usage
 
-Using `autoscan` is based on the following pattern:
+Using `extrapolaw` is based on the following pattern:
 
 1. Define an `evaluate_pipeline` function that evaluates a configuration of your pipeline.
 1. Define a `pipeline_space` of the parameters to optimize.
-1. Call `autoscan.run(evaluate_pipeline, pipeline_space)`.
+1. Call `extrapolaw.run(evaluate_pipeline, pipeline_space)`.
 1. Optionally, pass a `cost_estimator` and a cost budget to constrain the search by cost.
 
 In code, the usage pattern can look like this:
 
 ```python
-import autoscan
+import extrapolaw
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -75,17 +75,17 @@ def evaluate_pipeline(lr: float, alpha: int, optimizer: str, width: int):
 
 
 # 2. Define a search space of parameters; use the same parameter names as in evaluate_pipeline
-class ExampleSpace(autoscan.PipelineSpace):
-    lr = autoscan.Float(
+class ExampleSpace(extrapolaw.PipelineSpace):
+    lr = extrapolaw.Float(
         lower=1e-5,
         upper=1e-1,
         log=True,  # Log spaces
         log_base=10,  # Logarithm base, by default it's natural log
         prior=1e-3,  # Incorporate your knowledge to help optimization
     )
-    alpha = autoscan.Integer(lower=1, upper=42)
-    optimizer = autoscan.Categorical(choices=["sgd", "adam"])
-    width = autoscan.Integer(lower=64, upper=1024, log=True, is_compute_scaling=True)
+    alpha = extrapolaw.Integer(lower=1, upper=42)
+    optimizer = extrapolaw.Categorical(choices=["sgd", "adam"])
+    width = extrapolaw.Integer(lower=64, upper=1024, log=True, is_compute_scaling=True)
 
 
 # Optional: the cost of a configuration, e.g. its FLOPs, known before it is evaluated
@@ -93,8 +93,8 @@ def estimate_flops(width: int) -> float:
     return 6 * width**2 * 1e6
 
 
-# 3. Run the AutoScAn optimization
-autoscan.run(
+# 3. Run the Extrapolaw optimization
+extrapolaw.run(
     evaluate_pipeline=evaluate_pipeline,
     pipeline_space=ExampleSpace(),
     root_directory="path/to/save/results",  # Replace with the actual path.
@@ -104,7 +104,7 @@ autoscan.run(
 )
 ```
 
-To also fit scaling laws on top of the cost constraints, use one of the [scaling optimizers](https://automl.github.io/auto-scan/latest/reference/optimizers/#3-scaling-optimizers), e.g. `optimizer="carbs"`.
+To also fit scaling laws on top of the cost constraints, use one of the [scaling optimizers](https://automl.github.io/extrapolaw/latest/reference/optimizers/#3-scaling-optimizers), e.g. `optimizer="carbs"`.
 
 ## Resources to Get Started
 
@@ -114,34 +114,34 @@ Interactive notebooks that run in Google Colab:
 
 | Tutorial | What it covers | Run |
 |----------|----------------|-----|
-| **1. Getting Started with HPO** | Basic HPO workflow, synthetic functions, and deep learning tasks | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/1_getting_started_hpo.ipynb) |
-| **2. Defining Search Spaces** | Parameter types, fidelity parameters, and `PipelineSpace` classes | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/2_search_spaces.ipynb) |
-| **3. Efficient Optimization** | Multi-fidelity optimization, expert priors, optimizer selection, and parallelization | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/3_efficiency_techniques.ipynb) |
-| **4. Multi-Objective Optimization** | Multi-objective optimization with PriMO, including per-objective expert priors | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/auto-scan/blob/master/tutorials/4_multi_objective.ipynb) |
+| **1. Getting Started with HPO** | Basic HPO workflow, synthetic functions, and deep learning tasks | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/1_getting_started_hpo.ipynb) |
+| **2. Defining Search Spaces** | Parameter types, fidelity parameters, and `PipelineSpace` classes | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/2_search_spaces.ipynb) |
+| **3. Efficient Optimization** | Multi-fidelity optimization, expert priors, optimizer selection, and parallelization | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/3_efficiency_techniques.ipynb) |
+| **4. Multi-Objective Optimization** | Multi-objective optimization with PriMO, including per-objective expert priors | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/4_multi_objective.ipynb) |
 
 To run them locally instead, see the [tutorials folder](tutorials/).
 
 ### Examples
 
-- **[Hyperparameter optimization](autoscan_examples/basic_usage/1_hyperparameters.py):** the essentials of HPO with AutoScAn.
-- **[Multi-fidelity optimization](autoscan_examples/efficiency/multi_fidelity.py):** speed up tuning with cheap, low-fidelity evaluations.
-- **[Multi-objective optimization](autoscan_examples/efficiency/multi_objective.py):** optimize competing objectives with PriMO, using expert priors and multi-fidelity.
-- **[Expert priors](autoscan_examples/efficiency/expert_priors_for_hyperparameters.py):** use what you already know to focus the search.
-- **[Custom runtime with AskAndTell](autoscan_examples/experimental/ask_and_tell_example.py):** use AutoScAn optimizers and state with your own evaluation loop.
-- **[All examples](autoscan_examples/):** more use cases and advanced configurations.
+- **[Hyperparameter optimization](extrapolaw_examples/basic_usage/1_hyperparameters.py):** the essentials of HPO with Extrapolaw.
+- **[Multi-fidelity optimization](extrapolaw_examples/efficiency/multi_fidelity.py):** speed up tuning with cheap, low-fidelity evaluations.
+- **[Multi-objective optimization](extrapolaw_examples/efficiency/multi_objective.py):** optimize competing objectives with PriMO, using expert priors and multi-fidelity.
+- **[Expert priors](extrapolaw_examples/efficiency/expert_priors_for_hyperparameters.py):** use what you already know to focus the search.
+- **[Custom runtime with AskAndTell](extrapolaw_examples/experimental/ask_and_tell_example.py):** use Extrapolaw optimizers and state with your own evaluation loop.
+- **[All examples](extrapolaw_examples/):** more use cases and advanced configurations.
 
 ### Documentation
 
-- [Getting started](https://automl.github.io/auto-scan/latest/getting_started/)
-- [Reference](https://automl.github.io/auto-scan/latest/reference/autoscan_run/): running AutoScAn, search spaces, optimizers, and analysing runs
-- [Scaling optimizers](https://automl.github.io/auto-scan/latest/reference/optimizers/#3-scaling-optimizers): cost-constrained search guided by scaling laws
-- [Algorithms](https://automl.github.io/auto-scan/latest/reference/search_algorithms/landing_page_algo/)
-- [API](https://automl.github.io/auto-scan/latest/api/autoscan/api/)
+- [Getting started](https://automl.github.io/extrapolaw/latest/getting_started/)
+- [Reference](https://automl.github.io/extrapolaw/latest/reference/extrapolaw_run/): running Extrapolaw, search spaces, optimizers, and analysing runs
+- [Scaling optimizers](https://automl.github.io/extrapolaw/latest/reference/optimizers/#3-scaling-optimizers): cost-constrained search guided by scaling laws
+- [Algorithms](https://automl.github.io/extrapolaw/latest/reference/search_algorithms/landing_page_algo/)
+- [API](https://automl.github.io/extrapolaw/latest/api/extrapolaw/api/)
 
 ## Contributing
 
-Please see the [documentation for contributors](https://automl.github.io/auto-scan/latest/dev_docs/contributing/).
+Please see the [documentation for contributors](https://automl.github.io/extrapolaw/latest/dev_docs/contributing/).
 
-## Citing AutoScAn
+## Citing Extrapolaw
 
-To cite AutoScAn or the papers behind its algorithms, see our [citation guide](https://automl.github.io/auto-scan/latest/citations/).
+To cite Extrapolaw or the papers behind its algorithms, see our [citation guide](https://automl.github.io/extrapolaw/latest/citations/).

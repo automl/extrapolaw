@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from autoscan.utils.pareto import dominates, pareto_efficient
+from extrapolaw.utils.pareto import dominates, pareto_efficient
 
 
 @pytest.mark.parametrize(
