@@ -136,6 +136,13 @@ class BayesianOptimization(ScalingOptimizer):
     """Whether the GP with the power law prior mean in the cost models the log of the
     objective."""
 
+    prior_mean: Literal["power_law", "zero"] = "power_law"
+    """The prior mean of the GP. `"power_law"` is the power law in the cost fitted on the
+    trials, which needs a `cost_estimator`, else the GP falls back to the learned
+    constant mean of `SingleTaskGP`. `"zero"` ablates it with a zero mean of the
+    standardized outcomes, the `cost_estimator` still serving the budget schedule and
+    the max cost per config."""
+
     budget_schedule: Literal["none", "space_expansion", "left_budget_contraction"] = (
         "none"
     )
@@ -676,10 +683,18 @@ class BayesianOptimization(ScalingOptimizer):
                 prune_baseline=True,
             )
         else:
-            if cost_estimator is None:
+            if self.prior_mean == "zero":
+                from gpytorch.means import ZeroMean
+
+                gp = make_default_single_obj_gp(
+                    x=data.x, y=data.y, encoder=encoder, log_y=self.log_y
+                )
+                # Not the learned constant mean `SingleTaskGP` defaults to
+                gp.mean_module = ZeroMean()
+            elif cost_estimator is None:
                 logger.warning(
-                    "No cost estimator, the GP falls back to a zero prior mean instead"
-                    " of the power law in the cost."
+                    "No cost estimator, the GP falls back to a constant prior mean"
+                    " instead of the power law in the cost."
                 )
                 gp = make_default_single_obj_gp(x=data.x, y=data.y, encoder=encoder)
             else:

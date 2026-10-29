@@ -6,13 +6,15 @@ import time
 import pytest
 import torch
 from botorch.models import SingleTaskGP
+from gpytorch.means import ZeroMean
 
 from extrapolaw.exceptions import BudgetExhaustedError
+from extrapolaw.optimizers import bayesian_optimization as bo_module
 from extrapolaw.optimizers.acquisition.information_theoretic import (
     CostWeightedModifiedJES,
 )
 from extrapolaw.optimizers.algorithms import bayesian_optimization
-from extrapolaw.optimizers.models.gp import LogCost
+from extrapolaw.optimizers.models.gp import LogCost, PowerLawMean
 from extrapolaw.optimizers.optimizer import SampledConfig
 from extrapolaw.space import HPOFloat, HPOInteger, SearchSpace
 from extrapolaw.space.encoding import ConfigEncoder
@@ -208,3 +210,36 @@ def test_modified_jes_divides_by_the_normalized_exact_cost() -> None:
     c_norm = (log_cost.evaluate(X[:, 0]) / 6.0).clamp(min=1e-4)
     with torch.no_grad():
         assert torch.allclose(weighted(X), unweighted(X) / c_norm)
+
+
+@pytest.mark.parametrize(
+    ("prior_mean", "mean_type"), [("power_law", PowerLawMean), ("zero", ZeroMean)]
+)
+def test_prior_mean_keeps_the_schedule(
+    prior_mean: str, mean_type: type, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    torch.manual_seed(0)
+    gps: list[SingleTaskGP] = []
+    make_gp = bo_module.make_default_single_obj_gp
+
+    def spy(*args, **kwargs) -> SingleTaskGP:
+        gps.append(make_gp(*args, **kwargs))
+        return gps[-1]
+
+    monkeypatch.setattr(bo_module, "make_default_single_obj_gp", spy)
+    optimizer = _optimizer(
+        "left_budget_contraction", prior_mean=prior_mean, acquisition_func_type="IT-JES"
+    )
+    budget_info = BudgetInfo(worker_cost_to_spend=8e6)
+    trials: dict[str, Trial] = {}
+    for _ in range(5):
+        spent = sum(_cost(**t.config) for t in trials.values())
+        cap = optimizer._schedule_cap(
+            spent, 8e6, is_initial_design=len(trials) < optimizer.n_initial_design
+        )
+        sampled = optimizer(trials, budget_info)
+        assert _cost(**sampled.config) <= cap
+        trials[sampled.id] = _trial(sampled)
+
+    assert gps
+    assert all(type(gp.mean_module) is mean_type and gp.log_y for gp in gps)

@@ -95,6 +95,7 @@ def _bo(  # noqa: C901, PLR0912
     budget_schedule: Literal[
         "none", "space_expansion", "left_budget_contraction"
     ] = "none",
+    prior_mean: Literal["power_law", "zero"] = "power_law",
     target_flops: int | None = None,
 ) -> BayesianOptimization:
     """Initialise the BO loop.
@@ -124,6 +125,8 @@ def _bo(  # noqa: C901, PLR0912
             acquisition function. If `None`, a dimension-dependent heuristic is used.
         log_y: Whether the GP with the power law prior mean in the cost models the log
             of the objective.
+        prior_mean: The prior mean of the GP, the power law in the cost or zero, see
+            `BayesianOptimization.prior_mean`.
         budget_schedule: How the max cost of a sampled config follows the spent cost
             budget, see `BayesianOptimization.budget_schedule`.
         target_flops: The FLOPs the `"IT-SCAN-JES"` acquisition samples the optima
@@ -191,6 +194,7 @@ def _bo(  # noqa: C901, PLR0912
         constraints_func=constraints_func,
         acquisition_func_type=acquisition_func_type,
         log_y=log_y,
+        prior_mean=prior_mean,
         budget_schedule=budget_schedule,
         target_flops=target_flops,
     )
@@ -1392,6 +1396,7 @@ def bayesian_optimization(
     budget_schedule: Literal[
         "none", "space_expansion", "left_budget_contraction"
     ] = "none",
+    prior_mean: Literal["power_law", "zero"] = "power_law",
     target_flops: int | None = None,
     sample_prior_first: bool = False,
 ) -> BayesianOptimization:
@@ -1456,6 +1461,8 @@ def bayesian_optimization(
             optimization.
         log_y: Whether the GP with the power law prior mean in the cost models the log
             of the objective.
+        prior_mean: The prior mean of the GP, the power law in the cost or zero, see
+            `BayesianOptimization.prior_mean`.
         budget_schedule: How the max cost of a sampled config follows the spent cost
             budget, see `BayesianOptimization.budget_schedule`. Needs a
             `cost_estimator` and a cost budget given to `extrapolaw.acquire()`.
@@ -1512,6 +1519,7 @@ def bayesian_optimization(
         constraints_func=constraints_func,
         acquisition_func_type=acquisition_func_type,
         log_y=log_y,
+        prior_mean=prior_mean,
         budget_schedule=budget_schedule,
         target_flops=target_flops,
     )
