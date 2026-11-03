@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 
+from extrapolaw.exceptions import ConstraintViolationError
 from extrapolaw.sampling import Prior, Sampler
 
 if TYPE_CHECKING:
@@ -102,7 +103,7 @@ def make_initial_design(  # noqa: C901, PLR0912
                         break
             sample_configs = valid_sample_configs
             if len(sample_configs) < sample_size:
-                raise ValueError(
+                raise ConstraintViolationError(
                     f"Could not sample {sample_size} valid configurations out of "
                     f"{n_draws} samples, only got {len(sample_configs)} valid samples."
                 )

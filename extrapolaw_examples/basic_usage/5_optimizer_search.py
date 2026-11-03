@@ -95,7 +95,7 @@ if __name__ == "__main__":
     pipeline_space = OptimizerSpace()
 
     logging.basicConfig(level=logging.INFO)
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=pipeline_space,
         root_directory="results/optimizer_search_example",

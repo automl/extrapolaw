@@ -91,7 +91,7 @@ if __name__ == "__main__":
     # Run Extrapolaw with the defined pipeline and space and show the best configuration
     pipeline_space = NN_Space()
     logging.basicConfig(level=logging.INFO)
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=pipeline_space,
         root_directory="results/architecture_search_example",

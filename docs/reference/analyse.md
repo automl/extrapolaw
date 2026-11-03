@@ -1,7 +1,7 @@
 # Analysing Runs
 
 Everything Extrapolaw knows about a run lives on disk, in the `root_directory` you gave to
-[`extrapolaw.run()`][extrapolaw.api.run]. There are a few ways to look at it:
+[`extrapolaw.acquire()`][extrapolaw.api.acquire]. There are a few ways to look at it:
 
 !!! tip "Interactive tutorial"
 
@@ -96,7 +96,7 @@ joined up (red).
 
 Pass `live_plots=True` to have the plots
 redrawn after every evaluated trial as well. Where to pass it depends on how your
-trials are evaluated: via `extrapolaw.run()` or `extrapolaw.save_pipeline_results()` (see [the evaluate function](evaluate_pipeline.md)).
+trials are evaluated: via `extrapolaw.acquire()` or `extrapolaw.save_pipeline_results()` (see [the evaluate function](evaluate_pipeline.md)).
 
 !!! warning "Overhead"
 

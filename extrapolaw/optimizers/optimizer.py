@@ -15,10 +15,10 @@ class MyOpt:
         n: int | None = None,
     ) -> SampledConfig | list[SampledConfig]: ...
 
-extrapolaw.run(..., optimizer=MyOpt)
+extrapolaw.acquire(..., optimizer=MyOpt)
 
 # Or with optimizer hyperparameters
-extrapolaw.run(..., optimizer=(MyOpt, {"a": 1, "b": 2}))
+extrapolaw.acquire(..., optimizer=(MyOpt, {"a": 1, "b": 2}))
 ```
 """
 
@@ -160,7 +160,7 @@ class AskFunction(Protocol):
         Note:
             This method is optional. Optimizers that don't need to persist artifacts
             should return None (the default behavior). The runtime only calls it,
-            after every evaluated trial, when running `extrapolaw.run(...,
+            after every evaluated trial, when running `extrapolaw.acquire(...,
             live_plots=True)`.
 
         Example:
@@ -187,7 +187,7 @@ class AskFunction(Protocol):
 class ScalingOptimizer:
     """Base class for optimizers that are Extrapolaw-native.
 
-    `extrapolaw.run(..., cost_estimator=..., max_cost_per_config=...)` hands both to
+    `extrapolaw.acquire(..., cost_estimator=..., max_cost_per_config=...)` hands both to
     every optimizer inheriting from this class, right after it was created.
 
     ```python
@@ -211,7 +211,7 @@ class ScalingOptimizer:
         *,
         max_cost_per_config: float | None = None,
     ) -> None:
-        """Called by `extrapolaw.run()` with the cost estimator of the run."""
+        """Called by `extrapolaw.acquire()` with the cost estimator of the run."""
         self.cost_estimator = cost_estimator
         self.max_cost_per_config = max_cost_per_config
 
@@ -220,6 +220,7 @@ class ScalingOptimizer:
         constraints_func: Callable[[Mapping[str, Any]], float] | None = None,
         *,
         constants: Mapping[str, Any] | None = None,
+        margin: float = 0.0,
     ) -> Callable[[Mapping[str, Any]], float] | None:
         """Combine `max_cost_per_config` with a user given constraint.
 
@@ -228,6 +229,8 @@ class ScalingOptimizer:
             constants: Values to add to a configuration before estimating its cost
                 and evaluating `constraints_func`, for optimizers that check
                 configurations without their constants.
+            margin: The fraction of `max_cost_per_config` to stay below, so the
+                configurations cost at most `(1 - margin) * max_cost_per_config`.
 
         Returns:
             A function that is `>= 0` for configurations that satisfy the constraints
@@ -245,7 +248,7 @@ class ScalingOptimizer:
             values = []
             if has_budget:
                 # Normalize the cost to a slack value between 0 and 1.
-                values.append(1.0 - estimator(**full_config) / max_cost)  # type: ignore
+                values.append(1.0 - estimator(**full_config) / max_cost - margin)  # type: ignore
             if constraints_func is not None:
                 values.append(constraints_func(full_config))
             return min(values)

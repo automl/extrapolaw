@@ -42,7 +42,7 @@ def plot(  # noqa: C901, PLR0913
         benchmarks: List of benchmarks to plot
         algorithms: List of algorithms to plot
         consider_continuations: If true, toggle calculation of continuation costs
-        n_workers: Number of parallel processes of extrapolaw.run
+        n_workers: Number of parallel processes of extrapolaw.acquire
         x_range: Bound x-axis (e.g. 1 10)
         log_x: If true, toggle logarithmic scale on the x-axis
         log_y: If true, toggle logarithmic scale on the y-axis

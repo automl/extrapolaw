@@ -38,19 +38,19 @@ pip install extrapolaw
         return loss
     ```
 
-1. **Execute with [`extrapolaw.run()`](reference/extrapolaw_run.md)**:
+1. **Execute with [`extrapolaw.acquire()`](reference/extrapolaw_acquire.md)**:
 
     ```python
-    extrapolaw.run(evaluate_pipeline, ExampleSpace(), live_plots=True)
+    extrapolaw.acquire(evaluate_pipeline, ExampleSpace(), live_plots=True)
     ```
 
 ---
 
 ## What's Next?
 
-The [reference](reference/extrapolaw_run.md) section provides detailed information on the individual components of Extrapolaw.
+The [reference](reference/extrapolaw_acquire.md) section provides detailed information on the individual components of Extrapolaw.
 
-1. How to use the [**`extrapolaw.run()`** function](reference/extrapolaw_run.md) to start the optimization process.
+1. How to use the [**`extrapolaw.acquire()`** function](reference/extrapolaw_acquire.md) to start the optimization process.
 2. The different [search space](reference/extrapolaw_spaces.md) options available.
 3. How to choose and configure the [optimizer](reference/optimizers.md) used.
 4. How to define the [`evaluate_pipeline()` function](reference/evaluate_pipeline.md).

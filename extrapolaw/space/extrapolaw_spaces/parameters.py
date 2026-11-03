@@ -1148,8 +1148,8 @@ class Float(Domain[float]):
 
         """
         # Handle is_fidelity for backward compatibility
-        # Store it silently - user will get warning from extrapolaw.run about SearchSpace
-        # usage
+        # Store it silently - user will get warning from extrapolaw.acquire about
+        # SearchSpace usage
         # TODO: Remove this when removing SearchSpace support
         if "is_fidelity" in kwargs:
             warnings.warn(
@@ -1400,8 +1400,8 @@ class Integer(Domain[int]):
                 for backward compatibility but ignored in PipelineSpace parameters.
         """
         # Handle is_fidelity for backward compatibility
-        # Store it silently - user will get warning from extrapolaw.run about SearchSpace
-        # usage
+        # Store it silently - user will get warning from extrapolaw.acquire about
+        # SearchSpace usage
         # TODO: Remove this when removing SearchSpace support
         if "is_fidelity" in kwargs:
             warnings.warn(

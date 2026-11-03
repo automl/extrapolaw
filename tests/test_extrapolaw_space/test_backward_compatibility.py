@@ -1,4 +1,4 @@
-"""Test that legacy SearchSpace / dict pipeline_space inputs to extrapolaw.run are rejected."""
+"""Test that legacy SearchSpace / dict pipeline_space inputs to extrapolaw.acquire are rejected."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def simple_evaluation(learning_rate: float, num_layers: int, optimizer: str) -> 
 
 
 def test_searchspace_is_rejected():
-    """Passing a classic SearchSpace to extrapolaw.run should raise a ValueError."""
+    """Passing a classic SearchSpace to extrapolaw.acquire should raise a ValueError."""
     pipeline_space = SearchSpace(
         {
             "learning_rate": HPOFloat(1e-4, 1e-1, log=True),
@@ -37,7 +37,7 @@ def test_searchspace_is_rejected():
         root_directory = Path(tmp_dir) / "searchspace_rejected_test"
 
         with pytest.raises(ValueError, match="PipelineSpace"):
-            extrapolaw.run(
+            extrapolaw.acquire(
                 evaluate_pipeline=simple_evaluation,
                 pipeline_space=pipeline_space,
                 optimizer=algorithms.extrapolaw_random_search,
@@ -48,7 +48,7 @@ def test_searchspace_is_rejected():
 
 
 def test_dict_is_rejected():
-    """Passing a plain dict to extrapolaw.run should raise a ValueError."""
+    """Passing a plain dict to extrapolaw.acquire should raise a ValueError."""
     pipeline_space = {
         "learning_rate": Float(1e-4, 1e-1, log=True),
         "num_layers": Integer(1, 10),
@@ -59,7 +59,7 @@ def test_dict_is_rejected():
         root_directory = Path(tmp_dir) / "dict_rejected_test"
 
         with pytest.raises(ValueError, match="PipelineSpace"):
-            extrapolaw.run(
+            extrapolaw.acquire(
                 evaluate_pipeline=simple_evaluation,
                 pipeline_space=pipeline_space,
                 optimizer=algorithms.extrapolaw_random_search,
@@ -80,7 +80,7 @@ def test_proper_pipelinespace_still_works():
     with tempfile.TemporaryDirectory() as tmp_dir:
         root_directory = Path(tmp_dir) / "pipelinespace_test"
 
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=TestSpace(),
             optimizer=algorithms.extrapolaw_random_search,

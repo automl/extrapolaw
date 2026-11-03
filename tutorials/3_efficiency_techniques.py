@@ -114,7 +114,7 @@ class MultiFidelitySpace(extrapolaw.PipelineSpace):
 
 # ### Run Multi-Fidelity Optimization
 
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     root_directory="results_multi_fidelity/",
     pipeline_space=MultiFidelitySpace(),
@@ -167,7 +167,7 @@ class ExpertPriorSpace(extrapolaw.PipelineSpace):
 
 # ### Run Optimization with Priors
 
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     root_directory="results_with_priors/",
     pipeline_space=ExpertPriorSpace(),
@@ -200,7 +200,7 @@ for algo in ["successive_halving", "asha", "hyperband", "async_hb", "ifbo", "pri
     print(f"\n{algo} hyperparameters:")
     print(extract_keyword_defaults(PredefinedOptimizers[algo]))
 
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     root_directory="results_custom_optimizer/",
     pipeline_space=MultiFidelitySpace(),
@@ -217,7 +217,7 @@ extrapolaw.run(
 # ### Single Process Example (Sequential)
 
 # Sequential run
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     root_directory="results_sequential/",
     pipeline_space=ExpertPriorSpace(),
@@ -231,13 +231,13 @@ print("Sequential run complete")
 
 # ### Parallel Execution Pattern
 
-# To parallelize, run multiple `extrapolaw.run()` calls with the same `root_directory`:
+# To parallelize, run multiple `extrapolaw.acquire()` calls with the same `root_directory`:
 
 import multiprocessing as mp
 
 
 def run_worker():
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         root_directory="results_parallel/",
         pipeline_space=ExpertPriorSpace(),
@@ -296,7 +296,7 @@ class CombinedSearchSpace(extrapolaw.PipelineSpace):
 
 start_time = time.time()
 
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     root_directory="results_combined/",
     pipeline_space=CombinedSearchSpace(),

@@ -306,6 +306,18 @@ def test_algorithm_compatibility_with_tuples():
     assert compatibility in ["classic", "both"]
 
 
+def test_algorithm_compatibility_with_mappings():
+    """Test algorithm compatibility checking with mapping configurations."""
+    classic_config = {"name": "bayesian_optimization", "initial_design_size": 2}
+    assert check_extrapolaw_space_compatibility(classic_config) == "classic"
+
+    both_config = {"name": "random_search"}
+    assert check_extrapolaw_space_compatibility(both_config) == "both"
+
+    extrapolaw_config = {"name": "extrapolaw_random_search"}
+    assert check_extrapolaw_space_compatibility(extrapolaw_config) == "extrapolaw"
+
+
 def test_auto_algorithm_compatibility():
     """Test that 'auto' algorithm is handled correctly."""
     compatibility = check_extrapolaw_space_compatibility("auto")

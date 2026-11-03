@@ -138,7 +138,7 @@ nav:
   - Home: 'index.md'
   - Getting Started: 'getting_started.md'
   - Reference:
-    - Run: 'reference/extrapolaw_run.md'
+    - Acquire: 'reference/extrapolaw_acquire.md'
     - Extrapolaw Spaces: 'reference/extrapolaw_spaces.md'
     - The Evaluate Function: 'reference/evaluate_pipeline.md'
     - Analysing Runs: 'reference/analyse.md'

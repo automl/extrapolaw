@@ -58,7 +58,7 @@ Steps for a successful training pipeline:
 #3 Design the model.
 #4 Design the pipeline search spaces.
 #5 Design the evaluate pipeline function.
-#6 Use extrapolaw.run the run the entire search using your specified optimizer.
+#6 Use extrapolaw.acquire the run the entire search using your specified optimizer.
 
 Each step will be covered in detail throughout the code
 
@@ -333,7 +333,7 @@ if __name__ == "__main__":
         optimizer="random_search",
     )
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         **run_args,
         worker_evaluations_to_spend=3,
     )

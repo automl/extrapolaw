@@ -6,7 +6,7 @@ How much faster does a fixed HPO sweep finish when it gets more parallel workers
 
 - **Task:** evaluate the same 8 configs every time, a grid over `lr` × `wd` × `batch_size` (two values each).
 - **Data:** 100k LAION CC12M image/caption pairs (plus 2k for validation). Each config trains a 22.3M-parameter OpenCLIP model for 3 epochs.
-- **Workers:** the sweep runs four times, with 1, 2, 4 and 8 workers. Each worker is its own single-GPU Slurm job (NVIDIA H200) calling `extrapolaw.run()` on a shared root directory, with `worker_evaluations_to_spend = 8 / n_workers`.
+- **Workers:** the sweep runs four times, with 1, 2, 4 and 8 workers. Each worker is its own single-GPU Slurm job (NVIDIA H200) calling `extrapolaw.acquire()` on a shared root directory, with `worker_evaluations_to_spend = 8 / n_workers`.
 
 ![Throughput against number of workers](./../../docs/doc_images/examples/scaling_workers.png)
 

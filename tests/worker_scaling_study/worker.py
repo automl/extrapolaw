@@ -1,5 +1,6 @@
 """One Extrapolaw worker of a scaling-study setting, in its own Slurm job on its own GPU.
-Calls `extrapolaw.run` on the setting's shared root directory for its share of the sweep.
+Calls `extrapolaw.acquire` on the setting's shared root directory for its share of the
+sweep.
 """
 
 from __future__ import annotations
@@ -70,7 +71,7 @@ def main():
             **config,
         )
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=HPOSpace(),
         root_directory=args.root_dir,

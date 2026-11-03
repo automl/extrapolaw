@@ -222,7 +222,7 @@ if __name__ == "__main__":
         )
         epoch = extrapolaw.IntegerFidelity(lower=1, upper=3)
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=HPOSpace(),
         root_directory="results/pytorch_fsdp",
