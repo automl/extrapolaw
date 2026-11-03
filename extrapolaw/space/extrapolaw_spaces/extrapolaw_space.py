@@ -1389,6 +1389,10 @@ def check_extrapolaw_space_compatibility(
             - "classic" if the optimizer is a classic algorithm,
             - "both" if the optimizer is a combination of both.
     """
+    # A mapping is checked by the name of the optimizer it holds
+    if isinstance(optimizer_to_check, Mapping) and "name" in optimizer_to_check:
+        optimizer_to_check = optimizer_to_check["name"]
+
     inner_optimizer = None
     if isinstance(optimizer_to_check, partial):
         inner_optimizer = optimizer_to_check.func

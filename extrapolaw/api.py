@@ -22,6 +22,7 @@ from extrapolaw.optimizers import (
 from extrapolaw.optimizers.algorithms import PredefinedOptimizers
 from extrapolaw.runtime import _launch_runtime, _save_results
 from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import (
+    adjust_evaluation_pipeline_for_extrapolaw_space,
     check_extrapolaw_space_compatibility,
     convert_classic_to_extrapolaw_search_space,
     convert_extrapolaw_to_classic_search_space,
@@ -577,11 +578,7 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
     if _cost_estimator is not None:
         _eval = _with_estimated_cost(_eval, _cost_estimator)
     if isinstance(space, PipelineSpace):
-        pass
-    # TODO: this is a temporary workaround to allow
-    #  the old optimizers to work with the new pipeline space.
-    # _eval = adjust_evaluation_pipeline_for_extrapolaw_space( # noqa: ERA001
-    #     _eval, space)
+        _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)
 
     _launch_runtime(
         evaluation_fn=_eval,  # type: ignore
