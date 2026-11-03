@@ -6,7 +6,7 @@ import functools
 import logging
 import shutil
 import warnings
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Concatenate, Literal
 
@@ -22,7 +22,6 @@ from extrapolaw.optimizers import (
 from extrapolaw.optimizers.algorithms import PredefinedOptimizers
 from extrapolaw.runtime import _launch_runtime, _save_results
 from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import (
-    adjust_evaluation_pipeline_for_extrapolaw_space,
     check_extrapolaw_space_compatibility,
     convert_classic_to_extrapolaw_search_space,
     convert_extrapolaw_to_classic_search_space,
@@ -42,13 +41,14 @@ if TYPE_CHECKING:
     from ConfigSpace import ConfigurationSpace
 
     from extrapolaw.optimizers.algorithms import CustomOptimizer
+    from extrapolaw.prediction import Prediction, PredictorTypes, Target
     from extrapolaw.space import SearchSpace
     from extrapolaw.state.pipeline_eval import EvaluatePipelineReturn, UserResultDict
 
 logger = logging.getLogger(__name__)
 
 
-def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
     evaluate_pipeline: Callable[..., EvaluatePipelineReturn] | str,
     pipeline_space: ConfigurationSpace | PipelineSpace | None = None,
     *,
@@ -85,7 +85,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
     !!! tip "Parallelization"
 
         To run with multiple processes or machines, execute the script that
-        calls `extrapolaw.run()` multiple times. They will keep in sync using
+        calls `extrapolaw.acquire()` multiple times. They will keep in sync using
         the file-sytem, requiring that `root_directory` be shared between them.
 
 
@@ -118,7 +118,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
             prior_confidence="medium"
         )
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=MySpace(),
         root_directory="usage_example",
@@ -181,7 +181,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     prior_confidence="medium"
                 )
 
-            extrapolaw.run(
+            extrapolaw.acquire(
                 pipeline_space=MySpace()
             )
             ```
@@ -334,7 +334,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
             formats:
 
             ```python
-            extrapolaw.run(
+            extrapolaw.acquire(
                 ...,
                 optimizer=("priorband",
                     {
@@ -371,7 +371,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
                         #   The sampled configuration(s)
 
 
-                extrapolaw.run(
+                extrapolaw.acquire(
                     ...,
                     optimizer=MyOpt,
                 )
@@ -479,7 +479,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
             stacklevel=2,
         )
 
-    logger.info(f"Starting extrapolaw.run using root directory {root_directory}")
+    logger.info(f"Starting extrapolaw.acquire using root directory {root_directory}")
 
     # If continuing a run and optimizer is "auto" (default), load existing optimizer
     # with its parameters
@@ -491,7 +491,7 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     f"The run in '{root_path}' was started with the custom optimizer"
                     f" '{existing_optimizer_info['name']}', which cannot be rebuilt"
                     " from optimizer_info.yaml. Pass the same `optimizer` to"
-                    " `extrapolaw.run` to continue it."
+                    " `extrapolaw.acquire` to continue it."
                 )
             logger.info(
                 "Continuing optimization with existing optimizer: "
@@ -577,7 +577,11 @@ def run(  # noqa: C901, PLR0912, PLR0913, PLR0915
     if _cost_estimator is not None:
         _eval = _with_estimated_cost(_eval, _cost_estimator)
     if isinstance(space, PipelineSpace):
-        _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)  # TODO
+        pass
+    # TODO: this is a temporary workaround to allow
+    #  the old optimizers to work with the new pipeline space.
+    # _eval = adjust_evaluation_pipeline_for_extrapolaw_space( # noqa: ERA001
+    #     _eval, space)
 
     _launch_runtime(
         evaluation_fn=_eval,  # type: ignore
@@ -696,6 +700,155 @@ def analyze(root_directory: str | Path) -> None:
     summary = SummaryWriter.from_directory(root_directory, live_plots=True)
     summary.update(final=True)
     logger.info(f"The summary has been refreshed at: {summary.summary_dir}.")
+
+
+def predict(  # noqa: PLR0913
+    root_directory: str | Path,
+    target_flops: float | Sequence[float],
+    *,
+    predictor: str | PredictorTypes = "auto",
+    targets: Iterable[Target] | None = None,
+    params_estimator: Callable[..., float] | None = None,
+    data_parameter_name: str | None = None,
+    cost_estimator: Callable[..., float] | None = None,
+    learning_curves: bool = True,
+    best_loss_guess: float | None = None,
+    exponent_bounds: tuple[float, float] | None = None,
+    seed: int = 0,
+    cache_dir: str | Path | None = None,
+) -> list[Prediction]:
+    """Extrapolate the evaluated trials of a run to larger compute budgets.
+
+    The predictor is fitted once per target on the trials, then queried at every
+    budget.
+
+    ```python
+    predictions = extrapolaw.predict(
+        "results",
+        target_flops=[1e20, 1e21],
+        predictor="chinchilla3",
+        params_estimator=estimate_params,
+        data_parameter_name="n_data",
+    )
+    for p in predictions:
+        print(p.target_flops, p.loss, p.n_params, p.n_data)
+    ```
+
+    Args:
+        root_directory: Root directory of the Extrapolaw run. The flops of a trial are
+            the cost it reported, or what `cost_estimator` gives for it.
+        target_flops: The compute budget(s) to predict at.
+        predictor: A [`PredictorTypes`][extrapolaw.prediction.PredictorTypes] or its
+            name (`"power_law"`, `"chinchilla3"`, `"gp_posterior"`), or `"auto"` for
+            the one paired with the run's optimizer, `"power_law"` otherwise.
+        targets: The [`Target`][extrapolaw.prediction.Target]s to predict. By default
+            whatever the predictor provides, without `COARSE` when the trials have no
+            model size and data.
+        params_estimator: Called as `params_estimator(**config)` for the parameter
+            count of a trial, `extra["n_param"]` of its report is used without it.
+        data_parameter_name: The parameter that sets the amount of training data,
+            taken from the optimizer of the run if it has one, and from
+            `extra["n_data"]` of the reports otherwise.
+        cost_estimator: Called as `cost_estimator(**config)` for the flops of trials
+            that reported no cost. Needed by `"gp_posterior"`.
+        learning_curves: Fit the `COARSE` power law on the envelope of the learning
+            curves, reported as rows of `(n_data, flops, loss, ...)`, when there are
+            any.
+        best_loss_guess: Upper bound of the irreducible loss of `"chinchilla3"`, the
+            lowest observed loss by default.
+        exponent_bounds: Bounds of the exponents of `"chinchilla3"`.
+        seed: Seed of the `"gp_posterior"` candidate pool.
+        cache_dir: Where `"gp_posterior"` checkpoints its fit and predictions.
+
+    Returns:
+        One [`Prediction`][extrapolaw.prediction.Prediction] per target budget.
+    """
+    import numpy as np
+
+    from extrapolaw.prediction import (
+        DEFAULT_PREDICTORS,
+        PredictorTypes,
+        Target,
+        fit_and_predict,
+        get_predictor_type,
+        rows_from_trials,
+    )
+    from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import (
+        convert_extrapolaw_to_classic_search_space,
+    )
+
+    root_directory = Path(root_directory)
+    try:
+        state = ExtrapolawState.create_or_load(path=root_directory, load_only=True)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"No Extrapolaw run found at {root_directory}.") from e
+
+    if params_estimator is not None:
+        params_estimator = CostEstimator.from_callable(params_estimator)
+    if cost_estimator is not None:
+        cost_estimator = CostEstimator.from_callable(cost_estimator)
+    optimizer_info = state.lock_and_get_optimizer_info()
+
+    if data_parameter_name is None:
+        stored = optimizer_info.get("info", {}).get("data_parameter_name")
+        data_parameter_name = stored if isinstance(stored, str) else None
+    if predictor == "auto":
+        predictor = DEFAULT_PREDICTORS.get(
+            optimizer_info["name"], PredictorTypes.POWER_LAW
+        )
+    predictor_type = get_predictor_type(predictor)
+    # The GP posterior models the trials with the prior mean of the GP that acquired
+    # them, the power law in the cost unless the optimizer recorded another
+    prior_mean = optimizer_info.get("info", {}).get("prior_mean", "power_law")
+    if prior_mean not in ("power_law", "zero"):
+        prior_mean = "power_law"
+
+    rows, curves, configs = rows_from_trials(
+        state.lock_and_read_trials().values(),
+        params_estimator=params_estimator,
+        data_parameter_name=data_parameter_name,
+        cost_estimator=cost_estimator,
+    )
+    if targets is None:
+        has_scale = any(np.isfinite(r[0]) and np.isfinite(r[1]) for r in rows)
+        targets = [
+            t
+            for t in Target
+            if t in predictor_type.provides
+            and (t != Target.COARSE or has_scale or params_estimator is not None)
+        ]
+    targets = list(targets)
+
+    space: SearchSpace | None = None
+    # if Target.FULL in targets or predictor_type == PredictorTypes.GP_POSTERIOR:
+    saved_space = state.lock_and_get_search_space()
+    if isinstance(saved_space, PipelineSpace):
+        space = convert_extrapolaw_to_classic_search_space(saved_space)
+    else:
+        space = saved_space
+    if space is None:
+        raise ValueError(
+            f"No search space of a classic HPO kind saved at {root_directory},"
+            " which predicting the full configuration needs."
+        )
+
+    budgets = [target_flops] if isinstance(target_flops, int | float) else target_flops
+    return fit_and_predict(
+        predictor_type,
+        [float(flops) for flops in budgets],
+        targets=targets,
+        rows=rows,
+        configs=configs,
+        learning_curve_rows=curves if learning_curves else None,
+        space=space,
+        params_estimator=params_estimator,
+        cost_estimator=cost_estimator,
+        best_loss_guess=best_loss_guess,
+        exponent_bounds=exponent_bounds,
+        seed=seed,
+        cache_dir=None if cache_dir is None else Path(cache_dir),
+        prior_mean=prior_mean,
+    )
 
 
 def import_trials(  # noqa: C901
@@ -920,7 +1073,7 @@ def create_config(  # noqa: C901
                     f" {Path(root_directory) / 'pipeline_space.pkl'}\nPlease either:\n"
                     "  1. Don't provide pipeline_space (it will be loaded automatically),"
                     " or\n  2. Provide the same pipeline_space that was used in"
-                    " extrapolaw.run()"
+                    " extrapolaw.acquire()"
                 )
     elif pipeline_space is None:
         raise ValueError(
@@ -1048,7 +1201,7 @@ def load_config(  # noqa: C901, PLR0912, PLR0915
                             f" {root_dir / 'pipeline_space.pkl'}\\nPlease either:\\n  1."
                             " Don't provide pipeline_space (it will be loaded"
                             " automatically), or\\n  2. Provide the same pipeline_space"
-                            " that was used in extrapolaw.run()"
+                            " that was used in extrapolaw.acquire()"
                         )
             except ExtrapolawError:
                 raise
@@ -1154,12 +1307,12 @@ def load_pipeline_space(
     """Load the pipeline space from an extrapolaw run directory.
 
     This is a convenience function that loads the pipeline space that was saved
-    during an extrapolaw.run() call. The pipeline space is automatically saved to disk
+    during an extrapolaw.acquire() call. The pipeline space is automatically saved to disk
     and can be loaded to inspect it or use it with other extrapolaw utilities.
 
     Args:
         root_directory: Path to the extrapolaw results directory (the same path
-            that was passed to extrapolaw.run()).
+            that was passed to extrapolaw.acquire()).
 
     Returns:
         The pipeline space that was used in the extrapolaw run.
@@ -1171,7 +1324,7 @@ def load_pipeline_space(
     Example:
         ```python
         # After running extrapolaw
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=my_function,
             pipeline_space=MySpace(),
             root_directory="results",
@@ -1209,13 +1362,14 @@ def load_optimizer_info(
 ) -> OptimizerInfo:
     """Load the optimizer information from an extrapolaw run directory.
 
-    This function loads the optimizer metadata that was saved during an extrapolaw.run()
-    call, including the optimizer name and its configuration parameters. This is
-    useful for inspecting what optimizer was used and with what settings.
+    This function loads the optimizer metadata that was saved during an
+    extrapolaw.acquire() call, including the optimizer name and its configuration
+    parameters. This is useful for inspecting what optimizer was used and with what
+    settings.
 
     Args:
         root_directory: Path to the extrapolaw results directory (the same path
-            that was passed to extrapolaw.run()).
+            that was passed to extrapolaw.acquire()).
 
     Returns:
         A dictionary containing:
@@ -1228,7 +1382,7 @@ def load_optimizer_info(
     Example:
         ```python
         # After running extrapolaw
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=my_function,
             pipeline_space=MySpace(),
             root_directory="results",
@@ -1256,12 +1410,13 @@ def load_optimizer_info(
 
 
 __all__ = [
+    "acquire",
     "analyze",
     "create_config",
     "import_trials",
     "load_config",
     "load_optimizer_info",
     "load_pipeline_space",
-    "run",
+    "predict",
     "save_pipeline_results",
 ]

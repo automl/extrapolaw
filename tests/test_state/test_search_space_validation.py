@@ -1,6 +1,6 @@
 """Tests for search space validation and error handling.
 
-This file focuses on high-level integration tests through extrapolaw.run():
+This file focuses on high-level integration tests through extrapolaw.acquire():
 - Strict validation (errors on mismatched search spaces)
 - Auto-loading from disk
 - Error handling when search space is missing
@@ -54,7 +54,7 @@ def test_error_on_mismatched_search_space(tmp_path: Path):
     root_dir = tmp_path / "test_error"
 
     # Create initial state with TestSpace1
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -64,7 +64,7 @@ def test_error_on_mismatched_search_space(tmp_path: Path):
 
     # Try to continue with TestSpace2 - should raise ExtrapolawError
     with pytest.raises(ExtrapolawError, match="pipeline space on disk does not match"):
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=eval_fn2,
             pipeline_space=Space2(),
             optimizer="random_search",
@@ -78,7 +78,7 @@ def test_success_without_search_space_when_on_disk(tmp_path: Path):
     root_dir = tmp_path / "test_no_space"
 
     # Create initial state with TestSpace1
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -87,7 +87,7 @@ def test_success_without_search_space_when_on_disk(tmp_path: Path):
     )
 
     # Continue WITHOUT providing pipeline_space - should load from disk
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         # pipeline_space not provided!
         optimizer="random_search",
@@ -106,7 +106,7 @@ def test_error_when_no_space_provided_and_none_on_disk(tmp_path: Path):
 
     # Try to run WITHOUT providing pipeline_space and with no existing run
     with pytest.raises(ValueError, match="pipeline_space is required"):
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=eval_fn1,
             # pipeline_space not provided and root_dir doesn't exist!
             optimizer="random_search",
@@ -120,7 +120,7 @@ def test_load_only_does_not_validate(tmp_path: Path, caplog):
     root_dir = tmp_path / "test_load_only"
 
     # Create initial state
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -150,7 +150,7 @@ def test_load_config_with_wrong_space_raises_error(tmp_path: Path):
     root_dir = tmp_path / "test_load_config_error"
 
     # Create run with TestSpace1
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -177,7 +177,7 @@ def test_load_config_without_space_auto_loads(tmp_path: Path):
     root_dir = tmp_path / "test_load_config_auto"
 
     # Create run
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -205,7 +205,7 @@ def test_ddp_runtime_loads_search_space(tmp_path: Path):
     root_dir = tmp_path / "test_ddp"
 
     # Create initial state with search space
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -227,7 +227,7 @@ def test_status_without_space_works(tmp_path: Path):
     root_dir = tmp_path / "test_status_auto"
 
     # Create a run
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",
@@ -245,7 +245,7 @@ def test_status_handles_missing_search_space_gracefully(tmp_path: Path):
     root_dir = tmp_path / "test_status_missing"
 
     # Create a run
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=eval_fn1,
         pipeline_space=Space1(),
         optimizer="random_search",

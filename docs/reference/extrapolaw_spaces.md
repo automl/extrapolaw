@@ -28,16 +28,16 @@ class MySpace(extrapolaw.PipelineSpace):
 
 !!! info "Using **Extrapolaw Spaces**"
 
-    To search a **Extrapolaw space**, pass it as the `pipeline_space` argument to the `extrapolaw.run()` function:
+    To search a **Extrapolaw space**, pass it as the `pipeline_space` argument to the `extrapolaw.acquire()` function:
 
     ```python
-    extrapolaw.run(
+    extrapolaw.acquire(
         ...,
         pipeline_space=MySpace()
     )
     ```
 
-    For more details on how to use the `extrapolaw.run()` function, see the [Extrapolaw Run Reference](../reference/extrapolaw_run.md).
+    For more details on how to use the `extrapolaw.acquire()` function, see the [Extrapolaw Run Reference](../reference/extrapolaw_acquire.md).
 
 ### Using cheap approximation, providing a [**Fidelity**](../reference/search_algorithms/landing_page_algo.md#what-is-multi-fidelity-optimization) Parameter
 
@@ -247,8 +247,8 @@ pipeline_space = extrapolaw.load_pipeline_space("Path/to/extrapolaw_folder")
 
 !!! note "Auto-loading"
 
-    In most cases, you don't need to call `load_pipeline_space()` explicitly. When continuing a run, `extrapolaw.run()` automatically loads the search space from disk. See [Continuing Runs](extrapolaw_run.md#continuing-runs) for more details.
+    In most cases, you don't need to call `load_pipeline_space()` explicitly. When continuing a run, `extrapolaw.acquire()` automatically loads the search space from disk. See [Continuing Runs](extrapolaw_acquire.md#continuing-runs) for more details.
 
 !!! tip "Reconstructing a Run"
 
-    You can load both the search space and optimizer information to fully reconstruct a previous run. See [Reconstructing and Reproducing Runs](extrapolaw_run.md#reconstructing-and-reproducing-runs) for a complete example.
+    You can load both the search space and optimizer information to fully reconstruct a previous run. See [Reconstructing and Reproducing Runs](extrapolaw_acquire.md#reconstructing-and-reproducing-runs) for a complete example.

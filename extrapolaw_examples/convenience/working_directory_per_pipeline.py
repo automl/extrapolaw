@@ -25,7 +25,7 @@ class HPOSpace(extrapolaw.PipelineSpace):
 
 
 logging.basicConfig(level=logging.INFO)
-extrapolaw.run(
+extrapolaw.acquire(
     evaluate_pipeline=evaluate_pipeline,
     pipeline_space=HPOSpace(),
     root_directory="results/working_directory_per_pipeline",

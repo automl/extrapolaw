@@ -96,7 +96,7 @@ def test_basic_trajectory_functionality():
         root_directory = Path(tmp_dir) / "basic_test"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -135,7 +135,7 @@ def test_best_config_with_multiple_metrics():
         root_directory = Path(tmp_dir) / "best_config_test"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -171,7 +171,7 @@ def test_trajectory_with_fidelity():
         root_directory = Path(tmp_dir) / "fidelity_test"
 
         # Run optimization with fidelity
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=fidelity_evaluation,
             pipeline_space=SpaceWithFidelity(),
             optimizer=("extrapolaw_random_search", {"ignore_fidelity": True}),
@@ -203,7 +203,7 @@ def test_cumulative_metrics_tracking():
         root_directory = Path(tmp_dir) / "cumulative_test"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -241,7 +241,7 @@ def test_trajectory_with_failed_evaluations():
         root_directory = Path(tmp_dir) / "error_test"
 
         # Run optimization that will have some failures
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=failing_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -276,7 +276,7 @@ def test_extrapolaw_hyperband_metrics():
         root_directory = Path(tmp_dir) / "hyperband_test"
 
         # Run extrapolaw_hyperband optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=fidelity_evaluation,
             pipeline_space=SpaceWithFidelity(),
             optimizer=algorithms.extrapolaw_hyperband,
@@ -320,7 +320,7 @@ def test_metrics_with_different_optimizers(optimizer):
         root_directory = Path(tmp_dir) / f"optimizer_test_{optimizer.__name__}"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=optimizer,
@@ -362,7 +362,7 @@ def test_metric_values_are_reasonable():
         root_directory = Path(tmp_dir) / "validation_test"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -401,7 +401,7 @@ def test_trajectory_file_format():
         root_directory = Path(tmp_dir) / "format_test"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -436,7 +436,7 @@ def test_results_directory_structure():
         root_directory = Path(tmp_dir) / "structure_test"
 
         # Run optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -468,7 +468,7 @@ def test_extrapolaw_revisit_run_with_trajectory():
         root_directory = Path(tmp_dir) / "revisit_test"
 
         # First run - create initial optimization
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -491,7 +491,7 @@ def test_extrapolaw_revisit_run_with_trajectory():
         assert "Objective to minimize:" in initial_trajectory
 
         # Second run - revisit without overwriting
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -545,7 +545,7 @@ def test_continue_finished_run_with_higher_budget(run_number):
 
         # First run - complete optimization with HIGH budget to find a good solution
         initial_budget = 20
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,
@@ -584,7 +584,7 @@ def test_continue_finished_run_with_higher_budget(run_number):
         additional_budget = 5
         total_expected_budget = initial_budget + additional_budget
 
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=simple_evaluation,
             pipeline_space=SimpleSpace(),
             optimizer=algorithms.extrapolaw_random_search,

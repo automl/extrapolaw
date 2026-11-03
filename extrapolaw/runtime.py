@@ -30,6 +30,7 @@ from extrapolaw.env import (
     MAX_RETRIES_WORKER_CHECK_SHOULD_STOP,
 )
 from extrapolaw.exceptions import (
+    BudgetExhaustedError,
     ExtrapolawError,
     TrialAlreadyExistsError,
     WorkerFailedToGetPendingTrialsError,
@@ -172,7 +173,7 @@ def _set_global_trial(trial: Trial) -> Iterator[None]:
 class DefaultWorker:
     """A default worker for the Extrapolaw system.
 
-    This is the worker that is used by default in the extrapolaw.run() loop.
+    This is the worker that is used by default in the extrapolaw.acquire() loop.
     """
 
     state: ExtrapolawState
@@ -735,6 +736,10 @@ class DefaultWorker:
                 if trial_to_eval == "break":
                     break
                 _repeated_fail_get_next_trial_count = 0
+            except BudgetExhaustedError as e:
+                # Retrying won't free up budget, so stop instead of sampling again
+                logger.info("Worker '%s' stops: %s", self.worker_id, e)
+                break
             except Exception as e:
                 _repeated_fail_get_next_trial_count += 1
                 if isinstance(e, portalocker.exceptions.LockException):
@@ -965,8 +970,8 @@ def _derived_info_with_fidelity_name(
     return derived
 
 
-# TODO: This should be done directly in `api.run` at some point to make it clearer at an
-# entryy point how the worker is set up to run if someone reads the entry point code.
+# TODO: This should be done directly in `api.acquire` at some point to make it clearer at
+# an entryy point how the worker is set up to run if someone reads the entry point code.
 def _launch_runtime(  # noqa: PLR0913
     *,
     evaluation_fn: Callable[..., EvaluatePipelineReturn],

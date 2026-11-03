@@ -10,7 +10,7 @@ Usage:
 
 Optional arguments:
     -h, --help           show this help message and exit
-    --root-dir ROOT_DIR  The working directory given to extrapolaw.run
+    --root-dir ROOT_DIR  The working directory given to extrapolaw.acquire
                          (default: extrapolaw_results)
     --trial-ids          Only clean specific trial IDs (space-separated list)
     --dry-run            Show what would change without making changes
@@ -43,7 +43,9 @@ parser.add_argument(
     dest="root_directory",
     type=Path,
     default=Path("extrapolaw_results"),
-    help="The working directory given to extrapolaw.run (default: extrapolaw_results)",
+    help=(
+        "The working directory given to extrapolaw.acquire (default: extrapolaw_results)"
+    ),
 )
 parser.add_argument(
     "--trial-ids",

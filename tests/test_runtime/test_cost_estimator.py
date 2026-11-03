@@ -28,7 +28,7 @@ def test_estimated_cost_is_reported_and_spent(tmp_path: Path) -> None:
     def evaluate_pipeline(width: int, lr: float, dataset: str) -> dict:
         return {"objective_to_minimize": lr, "cost": width}
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=Space(),
         root_directory=tmp_path / "run",
@@ -53,7 +53,7 @@ def test_reported_cost_is_kept(tmp_path: Path) -> None:
         assert pipeline_directory.exists()
         return {"objective_to_minimize": lr, "cost": 1.0 if width == 64 else None}
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=Space(),
         root_directory=tmp_path / "run",
@@ -66,7 +66,7 @@ def test_reported_cost_is_kept(tmp_path: Path) -> None:
 
 def test_invalid_arguments(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="requires a `cost_estimator`"):
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=lambda **_: 1.0,
             pipeline_space=Space(),
             root_directory=tmp_path / "run",
@@ -76,7 +76,7 @@ def test_invalid_arguments(tmp_path: Path) -> None:
     table = tmp_path / "costs.json"
     table.write_text(json.dumps([{"config": {"depth": 1}, "cost": 1.0}]))
     with pytest.raises(ValueError, match="not in the pipeline space"):
-        extrapolaw.run(
+        extrapolaw.acquire(
             evaluate_pipeline=lambda **_: 1.0,
             pipeline_space=Space(),
             root_directory=tmp_path / "run",
@@ -115,7 +115,7 @@ def test_bayesian_optimization_without_cost_estimator(tmp_path: Path) -> None:
         x = extrapolaw.Float(0.0, 1.0)
         y = extrapolaw.Float(0.0, 1.0)
 
-    extrapolaw.run(
+    extrapolaw.acquire(
         evaluate_pipeline=lambda x, y: (x - 0.3) ** 2 + y,
         pipeline_space=FloatSpace(),
         root_directory=tmp_path / "run",

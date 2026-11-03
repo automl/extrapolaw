@@ -8,13 +8,14 @@ and algorithms.
 import logging
 
 from extrapolaw.api import (
+    acquire,
     analyze,
     create_config,
     import_trials,
     load_config,
     load_optimizer_info,
     load_pipeline_space,
-    run,
+    predict,
     save_pipeline_results,
 )
 from extrapolaw.optimizers import algorithms
@@ -63,6 +64,7 @@ __all__ = [
     "SearchSpace",
     "Trial",
     "UserResultDict",
+    "acquire",
     "algorithms",
     "analyze",
     "convert_operation_to_callable",
@@ -73,7 +75,7 @@ __all__ = [
     "load_optimizer_info",
     "load_pipeline_space",
     "plot",
-    "run",
+    "predict",
     "save_pipeline_results",
     "status",
     "tblogger",
