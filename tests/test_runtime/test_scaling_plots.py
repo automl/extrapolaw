@@ -26,6 +26,7 @@ def _scaling(width: int, lr: float) -> dict:
             "n_param": n_params,
             "dropout": 0.0 if width < 64 else 0.1,
             "predictions": {"task_acc": {"mean": 0.9 - 1.0 / width}},
+            "inference_cost": 2.0 * n_params,
         },
     }
 
@@ -57,10 +58,14 @@ def test_scaling_plots_are_written(tmp_path: Path) -> None:
         "parameters/lr_over_cost",
         "parameters/n_param_over_cost",
         "downstream/task_acc_over_cost",
+        "loss_over_inference_cost",
+        "parameters/width_over_inference_cost",
+        "downstream/task_acc_over_inference_cost",
     ):
         assert (scaling / f"{name}.png").exists()
         assert len(pd.read_csv(scaling / f"{name}.csv")) == 6
 
+    assert not (scaling / "parameters" / "inference_cost_over_cost.png").exists()
     downstream = pd.read_csv(scaling / "downstream" / "task_acc_over_cost.csv")
     assert (downstream["downstream/task_acc"] < 0.5).all()
 

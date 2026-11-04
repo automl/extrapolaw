@@ -29,6 +29,9 @@ DOWNSTREAM_KEY = "predictions"
 """Key of the downstream metrics in the `info_dict`:
 `{"predictions": {"<name>": {"mean": value}}}`."""
 
+INFERENCE_COST_KEY = "inference_cost"
+"""Key of the inference cost in the `info_dict`."""
+
 
 def _is_higher_better(metric: str) -> bool:
     """Accuracy-like metrics, which are flipped to `1 - value`."""
@@ -46,6 +49,12 @@ def _downstream(extra: dict) -> dict[str, float]:
             flipped = 1.0 - value if _is_higher_better(metric) else value
             metrics[f"downstream/{metric}"] = float(flipped)
     return metrics
+
+
+def _with_frontier(table: pd.DataFrame, cost: str, loss: str) -> pd.DataFrame:
+    """The runs that report `cost` and `loss`, with whether each is on their frontier."""
+    table = table.dropna(subset=[cost, loss])
+    return table.assign(on_frontier=pareto_efficient(table[[cost, loss]].to_numpy(float)))
 
 
 def runs_table(trials: Sequence[Trial]) -> pd.DataFrame:
@@ -78,17 +87,19 @@ def runs_table(trials: Sequence[Trial]) -> pd.DataFrame:
     return table
 
 
-def plot_loss_over_cost(table: pd.DataFrame, loss: str = "loss") -> list[Artifact]:
+def plot_loss_over_cost(
+    table: pd.DataFrame, loss: str = "loss", cost: str = "cost"
+) -> list[Artifact]:
     """Every run's loss over its cost, the Pareto frontier and a power law through it.
 
     Args:
         table: The runs, from `runs_table`.
-        loss: The column to plot: `"loss"`, or a downstream metric, which then gets a
+        loss: The column to plot: "loss", or a downstream metric, which then gets a
             frontier of its own.
+        cost: The cost to plot over: "cost", or "inference_cost", which then gets
+            a frontier of its own.
     """
-    table = table.dropna(subset=[loss])
-    on_frontier = pareto_efficient(table[["cost", loss]].to_numpy(float))
-    table = table.assign(on_frontier=on_frontier)
+    table = _with_frontier(table, cost, loss)
     front = table[table["on_frontier"]].sort_values("cost")
     others = table[~table["on_frontier"]]
 
@@ -96,27 +107,28 @@ def plot_loss_over_cost(table: pd.DataFrame, loss: str = "loss") -> list[Artifac
     label = "Loss" if loss == "loss" else metric
     if _is_higher_better(metric):
         label = f"1 - {metric}"
+    cost_label = cost.replace("_", " ")
 
     fig = Figure(figsize=(6, 4))
     ax = fig.add_subplot()
     ax.scatter(
-        others["cost"],
+        others[cost],
         others[loss],
         s=10,
         color=DOMINATED_COLOR,
         label="Dominated runs",
     )
-    fit = fit_power_law(front["cost"].to_numpy(), front[loss].to_numpy())
+    fit = fit_power_law(front[cost].to_numpy(), front[loss].to_numpy())
     if fit is not None:
         ax.plot(
-            front["cost"],
-            10**fit.intercept * front["cost"] ** fit.slope,
+            front[cost],
+            10**fit.intercept * front[cost] ** fit.slope,
             color="black",
             linewidth=2,
             label=f"Power-law fit (slope {fit.slope:.3f})",
         )
     ax.scatter(
-        front["cost"],
+        front[cost],
         front[loss],
         s=36,
         color=PARETO_COLOR,
@@ -128,36 +140,38 @@ def plot_loss_over_cost(table: pd.DataFrame, loss: str = "loss") -> list[Artifac
     ax.set(
         xscale="log",
         yscale="log",
-        xlabel="Cost",
+        xlabel=cost_label.capitalize(),
         ylabel=label,
-        title=f"{label} over cost",
+        title=f"{label} over {cost_label}",
     )
     ax.grid(visible=True, alpha=0.3, linestyle="--")
     ax.legend()
 
     if loss == "loss":
-        name = "scaling/loss_over_cost"
+        name = f"scaling/loss_over_{cost}"
     else:
-        name = f"scaling/downstream/{metric.replace('.', '_')}_over_cost"
+        name = f"scaling/downstream/{metric.replace('.', '_')}_over_{cost}"
     return [
         Artifact(name, fig, ArtifactType.FIGURE),
-        Artifact(
-            name, table[["trial_id", "cost", loss, "on_frontier"]], ArtifactType.CSV
-        ),
+        Artifact(name, table[["trial_id", cost, loss, "on_frontier"]], ArtifactType.CSV),
     ]
 
 
-def plot_parameter_over_cost(table: pd.DataFrame, parameter: str) -> list[Artifact]:
-    """One parameter of every run over its cost, coloured by loss, with the frontier
-    runs circled and a power law through them.
+def plot_parameter_over_cost(
+    table: pd.DataFrame, parameter: str, cost: str = "cost"
+) -> list[Artifact]:
+    """One parameter of every run over its cost, coloured by loss, with the runs on the
+    frontier of loss over this cost circled and a power law through them.
     """
-    front = table[table["on_frontier"]].sort_values("cost")
+    table = _with_frontier(table, cost, "loss")
+    front = table[table["on_frontier"]].sort_values(cost)
+    cost_label = cost.replace("_", " ")
 
     fig = Figure(figsize=(7, 4))
     ax = fig.add_subplot()
-    points = ax.scatter(table["cost"], table[parameter], c=table["loss"], s=50, alpha=0.7)
+    points = ax.scatter(table[cost], table[parameter], c=table["loss"], s=50, alpha=0.7)
     ax.scatter(
-        front["cost"],
+        front[cost],
         front[parameter],
         s=150,
         facecolors="none",
@@ -165,11 +179,11 @@ def plot_parameter_over_cost(table: pd.DataFrame, parameter: str) -> list[Artifa
         linewidths=2,
         label="Pareto frontier",
     )
-    fit = fit_power_law(front["cost"].to_numpy(), front[parameter].to_numpy())
+    fit = fit_power_law(front[cost].to_numpy(), front[parameter].to_numpy())
     if fit is not None:
         ax.plot(
-            front["cost"],
-            10**fit.intercept * front["cost"] ** fit.slope,
+            front[cost],
+            10**fit.intercept * front[cost] ** fit.slope,
             "r--",
             linewidth=2.5,
             label=f"Fit (slope {fit.slope:.3f})",
@@ -177,16 +191,16 @@ def plot_parameter_over_cost(table: pd.DataFrame, parameter: str) -> list[Artifa
     ax.set(
         xscale="log",
         yscale="log",
-        xlabel="Cost",
+        xlabel=cost_label.capitalize(),
         ylabel=parameter,
-        title=f"{parameter} over cost",
+        title=f"{parameter} over {cost_label}",
     )
     ax.grid(visible=True, alpha=0.3, linestyle="--")
     ax.legend()
     fig.colorbar(points, ax=ax, label="Loss")
 
-    name = f"scaling/parameters/{parameter.replace('.', '_')}_over_cost"
-    columns = ["trial_id", "cost", parameter, "loss", "on_frontier"]
+    name = f"scaling/parameters/{parameter.replace('.', '_')}_over_{cost}"
+    columns = ["trial_id", cost, parameter, "loss", "on_frontier"]
     return [
         Artifact(name, fig, ArtifactType.FIGURE),
         Artifact(name, table[columns], ArtifactType.CSV),
@@ -210,19 +224,18 @@ def pareto_optimal_points(table: pd.DataFrame, trials: Sequence[Trial]) -> Artif
 
 
 def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
-    """All scaling plots, if any successful run reports a cost."""
+    """All scaling plots, over the cost and, if reported, the inference cost, if any
+    successful run reports a cost.
+    """
     table = runs_table(trials)
     if table.empty:
         return []
 
-    artifacts = plot_loss_over_cost(table)
-    artifacts.append(pareto_optimal_points(table, trials))
-
     downstream = [c for c in table.columns if c.startswith("downstream/")]
-    for metric in downstream:
-        artifacts += plot_loss_over_cost(table, metric)
+    inference_cost = [INFERENCE_COST_KEY] if INFERENCE_COST_KEY in table.columns else []
 
-    for parameter in table.columns.drop([*COLUMNS, *downstream]):
+    parameters = []
+    for parameter in table.columns.drop([*COLUMNS, *downstream, *inference_cost]):
         values = table[parameter]
         if (
             values.isna().any()
@@ -230,7 +243,15 @@ def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
             or np.allclose(values, table["cost"])
         ):
             continue
-        artifacts += plot_parameter_over_cost(table, parameter)
+        parameters.append(parameter)
+
+    artifacts = [pareto_optimal_points(table, trials)]
+    for cost in ["cost", *inference_cost]:
+        artifacts += plot_loss_over_cost(table, cost=cost)
+        for metric in downstream:
+            artifacts += plot_loss_over_cost(table, metric, cost)
+        for parameter in parameters:
+            artifacts += plot_parameter_over_cost(table, parameter, cost)
     return artifacts
 
 

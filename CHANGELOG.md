@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `extrapolaw.acquire(cost_estimator=..., max_cost_per_config=...)` for scaling studies. The cost estimator is a function or, for finite spaces, a JSON table. It fills in the `cost` of evaluations that do not report one and is handed to optimizers inheriting from `ScalingOptimizer`.
 - `carbs` optimizer, wrapping [CARBS](https://github.com/imbue-ai/carbs).
 - `chinchilla` optimizer for [Chinchilla](https://arxiv.org/abs/2203.15556) guided scaling studies.
-- Added scaling plots in with CSV outputs and TensorBoard logging. Loss over cost, downstream metrics (`info_dict["predictions"]`) over cost, and parameters over cost and Pareto-optimal runs and their configurations in `pareto_optimal_points.json`.
+- Added scaling plots also with the inference cost in with CSV outputs and TensorBoard logging.
 
 ### Changed
 - **BREAKING:** Renamed `extrapolaw.run()` to `extrapolaw.acquire()`.
