@@ -25,30 +25,24 @@ PARETO_COLOR = "#D55E00"
 DOMINATED_COLOR = "#B0B0B0"
 COLUMNS = ["trial_id", "cost", "loss", "on_frontier"]
 
-DOWNSTREAM_KEY = "predictions"
-"""Key of the downstream metrics in the `info_dict`:
-`{"predictions": {"<name>": {"mean": value}}}`."""
-
-INFERENCE_COST_KEY = "inference_cost"
-"""Key of the inference cost in the `info_dict`."""
-
 
 def _is_higher_better(metric: str) -> bool:
     """Accuracy-like metrics, which are flipped to `1 - value`."""
     return "_acc" in metric or "recall" in metric
 
 
-def _downstream(extra: dict) -> dict[str, float]:
-    """The downstream metrics of a report, as `downstream/<name>` columns."""
+def _downstream(performances: dict[str, float]) -> dict[str, float]:
+    """The downstream performances of a report, as `downstream/<name>` columns."""
     metrics = {}
-    for metric, reported in (extra.get(DOWNSTREAM_KEY) or {}).items():
-        if not isinstance(reported, dict):
-            continue
-        value = reported.get("mean")
-        if isinstance(value, int | float) and not isinstance(value, bool):
-            flipped = 1.0 - value if _is_higher_better(metric) else value
-            metrics[f"downstream/{metric}"] = float(flipped)
+    for metric, value in performances.items():
+        flipped = 1.0 - value if _is_higher_better(metric) else value
+        metrics[f"downstream/{metric}"] = flipped
     return metrics
+
+
+def _costs(table: pd.DataFrame) -> list[str]:
+    """`cost`, and `inference_cost` if the runs report it."""
+    return ["cost", "inference_cost"] if "inference_cost" in table.columns else ["cost"]
 
 
 def _with_frontier(table: pd.DataFrame, cost: str, loss: str) -> pd.DataFrame:
@@ -59,8 +53,8 @@ def _with_frontier(table: pd.DataFrame, cost: str, loss: str) -> pd.DataFrame:
 
 def runs_table(trials: Sequence[Trial]) -> pd.DataFrame:
     """One row per successful trial with a positive cost: its cost, loss, whether it is
-    on the Pareto frontier, the numbers of its config and `info_dict`, and its
-    downstream metrics.
+    on the Pareto frontier, the numbers of its config and `info_dict`, its inference
+    cost and its downstream performances.
     """
     rows: list[dict] = []
     for trial in trials:
@@ -75,7 +69,9 @@ def runs_table(trials: Sequence[Trial]) -> pd.DataFrame:
             for name, value in values.items():
                 if isinstance(value, int | float) and not isinstance(value, bool):
                     row[name] = value
-        row.update(_downstream(extra))
+        row.update(_downstream(report.downstream_performances))
+        if report.inference_cost is not None:
+            row["inference_cost"] = report.inference_cost
         row["trial_id"] = trial.id
         row["cost"] = float(report.cost)
         row["loss"] = float(report.objective_to_minimize)  # type: ignore[arg-type]
@@ -232,10 +228,9 @@ def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
         return []
 
     downstream = [c for c in table.columns if c.startswith("downstream/")]
-    inference_cost = [INFERENCE_COST_KEY] if INFERENCE_COST_KEY in table.columns else []
-
+    costs = _costs(table)
     parameters = []
-    for parameter in table.columns.drop([*COLUMNS, *downstream, *inference_cost]):
+    for parameter in table.columns.drop([*COLUMNS, *downstream, *costs[1:]]):
         values = table[parameter]
         if (
             values.isna().any()
@@ -246,7 +241,7 @@ def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
         parameters.append(parameter)
 
     artifacts = [pareto_optimal_points(table, trials)]
-    for cost in ["cost", *inference_cost]:
+    for cost in costs:
         artifacts += plot_loss_over_cost(table, cost=cost)
         for metric in downstream:
             artifacts += plot_loss_over_cost(table, metric, cost)

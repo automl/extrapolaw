@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Self
@@ -66,6 +66,8 @@ class Report:  # noqa: PLW1641
     tb: str | None
     reported_as: Literal["success", "failed", "crashed"]
     evaluation_duration: float | None
+    inference_cost: float | None = None
+    downstream_performances: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if isinstance(self.err, str):
@@ -88,7 +90,7 @@ class Report:  # noqa: PLW1641
             if k == "err":
                 if str(v) != str(other_v):
                     return False
-            elif k in ("objective_to_minimize", "cost"):
+            elif k in ("objective_to_minimize", "cost", "inference_cost"):
                 if v is not None and np.isnan(v):
                     if other_v is None or not np.isnan(other_v):
                         return False
@@ -208,7 +210,7 @@ class Trial:
         self.metadata.evaluating_worker_id = str(worker_id)
         self.metadata.state = State.EVALUATING
 
-    def set_complete(
+    def set_complete(  # noqa: PLR0913
         self,
         *,
         report_as: Literal["success", "failed", "crashed"],
@@ -220,6 +222,8 @@ class Trial:
         tb: str | None,
         extra: dict[str, Any] | None,
         evaluation_duration: float | None,
+        inference_cost: float | None = None,
+        downstream_performances: dict[str, float] | None = None,
     ) -> Report:
         """Set the report for the trial."""
         if report_as == "success":
@@ -243,6 +247,8 @@ class Trial:
             extra=extra if extra is not None else {},
             err=err,
             tb=tb,
+            inference_cost=inference_cost,
+            downstream_performances=dict(downstream_performances or {}),
         )
 
     def set_corrupted(self) -> None:

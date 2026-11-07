@@ -36,6 +36,14 @@ class UserResultDict(TypedDict, total=False):
     cost: float | None
     """The cost of the evaluation, if any"""
 
+    inference_cost: float | None
+    """The cost of using the trained model once, e.g. the FLOPs of one forward pass.
+    The scaling plots are also drawn over it."""
+
+    downstream_performances: Mapping[str, float] | None
+    """The model's performance on downstream tasks, by name, e.g.
+    `{"hellaswag_acc": 0.41}`. The scaling plots draw each of them over the cost."""
+
     exception: Exception | None
     """The exception that occured."""
 
@@ -81,8 +89,10 @@ class UserResult:
     learning_curve: list[float] | list[list[float]] | None = None
     extra: dict[str, Any] = field(default_factory=dict)
     exception: Exception | None = None
+    inference_cost: float | None = None
+    downstream_performances: dict[str, float] = field(default_factory=dict)
 
-    def __post_init__(self) -> None:  # noqa: C901, PLR0912
+    def __post_init__(self) -> None:  # noqa: C901, PLR0912, PLR0915
         # This is the type that we will use to profliferate to the rest of Extrapolaw.
         # It's super important that everything that we have as types here is correct.
         # The rest of Extrapolaw has type-safety built in and expects these to be correct.
@@ -155,6 +165,28 @@ class UserResult:
                 case _:
                     raise ValueError(
                         f"The 'extra' should be a dictionary. Got {self.extra}"
+                    )
+            match self.inference_cost:
+                case np.number() | float() | int():
+                    self.inference_cost = float(self.inference_cost)
+                case None:
+                    pass
+                case _:
+                    raise ValueError(
+                        "The 'inference_cost' should be either a float or None."
+                        f" Got {self.inference_cost}"
+                    )
+
+            match self.downstream_performances:
+                case Mapping():
+                    self.downstream_performances = {
+                        str(name): float(value)
+                        for name, value in self.downstream_performances.items()
+                    }
+                case _:
+                    raise ValueError(
+                        "The 'downstream_performances' should be a dictionary of"
+                        f" floats. Got {self.downstream_performances}"
                     )
 
         except Exception as e:
@@ -363,6 +395,9 @@ class UserResult:
                     extra=extra_info,
                     learning_curve=learning_curve,
                     exception=exception,
+                    inference_cost=_result.pop("inference_cost", None),
+                    downstream_performances=_result.pop("downstream_performances", None)
+                    or {},
                 )
 
             case _:
@@ -431,6 +466,8 @@ def _eval_trial(
             extra=result.extra,
             time_end=time_end,
             evaluation_duration=duration,
+            inference_cost=result.inference_cost,
+            downstream_performances=result.downstream_performances,
         )
 
     return report

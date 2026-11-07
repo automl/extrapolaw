@@ -881,6 +881,8 @@ def _save_results(
         extra=result.extra,
         time_end=time.time(),
         evaluation_duration=result.cost,
+        inference_cost=result.inference_cost,
+        downstream_performances=result.downstream_performances,
     )
 
     worker_id = trial.metadata.evaluating_worker_id

@@ -22,11 +22,11 @@ def _scaling(width: int, lr: float) -> dict:
     return {
         "objective_to_minimize": 1.0 + 10.0 / n_params**0.3 + abs(np.log10(lr) + 2.5),
         "cost": 6.0 * n_params * 1e6,
+        "inference_cost": 2.0 * n_params,
+        "downstream_performances": {"task_acc": 0.9 - 1.0 / width},
         "info_dict": {
             "n_param": n_params,
             "dropout": 0.0 if width < 64 else 0.1,
-            "predictions": {"task_acc": {"mean": 0.9 - 1.0 / width}},
-            "inference_cost": 2.0 * n_params,
         },
     }
 

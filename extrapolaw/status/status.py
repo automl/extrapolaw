@@ -143,13 +143,20 @@ class Summary:
             extra_df = pd.json_normalize(extra_column).rename(  # type: ignore
                 columns=lambda name: f"extra.{name}"
             )
+        downstream_df = pd.DataFrame()
+        # The same for the downstream performances, one column per metric
+        if "downstream_performances" in report_df.columns:
+            downstream_column = report_df.pop("downstream_performances")
+            downstream_df = pd.DataFrame.from_records(
+                [v if isinstance(v, dict) else {} for v in downstream_column]
+            ).rename(columns=lambda name: f"downstream_performances.{name}")
 
         # Metadata dataframe
         metadata_df = pd.DataFrame.from_records(
             [asdict(t.metadata) for t in trials]
         ).convert_dtypes()
         combined_df = pd.concat(
-            [config_df, extra_df, report_df, metadata_df], axis="columns"
+            [config_df, extra_df, downstream_df, report_df, metadata_df], axis="columns"
         )
         if combined_df.empty:
             return combined_df

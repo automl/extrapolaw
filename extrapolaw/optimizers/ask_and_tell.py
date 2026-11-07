@@ -261,6 +261,8 @@ class AskAndTell:
             time_end=time_end,
             evaluation_duration=evaluation_duration,
             tb=traceback_str,
+            inference_cost=parsed_result.inference_cost,
+            downstream_performances=parsed_result.downstream_performances,
         )
         self.trials[config_id] = trial
         return trial
@@ -327,5 +329,7 @@ class AskAndTell:
             evaluation_duration=evaluation_duration,
             err=parsed_result.exception,
             tb=traceback_str,
+            inference_cost=parsed_result.inference_cost,
+            downstream_performances=parsed_result.downstream_performances,
         )
         return _trial

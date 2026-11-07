@@ -182,6 +182,19 @@ EXCEPTION = Exception("")
             d(),
             UserResult(objective_to_minimize=1.0, extra={"a": "b"}),
         ),
+        (
+            {
+                "objective_to_minimize": 1.0,
+                "inference_cost": 2,
+                "downstream_performances": {"task_acc": np.float32(0.5)},
+            },
+            d(),
+            UserResult(
+                objective_to_minimize=1.0,
+                inference_cost=2.0,
+                downstream_performances={"task_acc": 0.5},
+            ),
+        ),
     ],
 )
 def test_user_result_parse_success(
@@ -204,6 +217,9 @@ def test_user_result_parse_success(
         ({"objective_to_minimize": 1.0, "learning_curve": object()}, d()),
         ({"objective_to_minimize": 1.0, "info_dict": object()}, d()),
         ({"objective_to_minimize": 1.0, "exception": object()}, d()),
+        ({"objective_to_minimize": 1.0, "inference_cost": "2"}, d()),
+        ({"objective_to_minimize": 1.0, "downstream_performances": [0.5]}, d()),
+        ({"objective_to_minimize": 1.0, "downstream_performances": {"a": "b"}}, d()),
         # Bad defaults (obj)
         (EXCEPTION, d(obj=object())),
         ({"exception": EXCEPTION}, d(obj=object())),
