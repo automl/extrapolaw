@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
-import sys
 from pathlib import Path
+from typing import NoReturn
 
 import numpy as np
 import pandas as pd
+import portalocker as pl
 import pytest
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
@@ -148,13 +148,14 @@ def test_tensorboard_steps_stay_the_same(tmp_path: Path) -> None:
     assert frontiers[1].count("(") == 1
 
 
-HOLD_LOCK = """
-import fcntl, sys, time
-with open(sys.argv[1], "a") as file:
-    fcntl.lockf(file, fcntl.LOCK_EX)
-    print("locked", flush=True)
-    time.sleep(60)
-"""
+class _BusyLocker:
+    """A TensorBoard lock that another worker holds for longer than the timeout."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    def lock(self) -> NoReturn:
+        raise pl.exceptions.LockException
 
 
 def test_tensorboard_is_fail_safe(
@@ -163,23 +164,13 @@ def test_tensorboard_is_fail_safe(
     root = tmp_path / "results"
     log_dir = root / "summary_tb"
     _run(root, _scaling)
-    monkeypatch.setattr(scaling_plots, "TENSORBOARD_LOCK_TIMEOUT", 0.2)
-    holder = subprocess.Popen(  # noqa: S603
-        [sys.executable, "-c", HOLD_LOCK, str(log_dir / ".tensorboard.lock")],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        assert holder.stdout is not None
-        assert holder.stdout.readline().strip() == "locked"
-        with caplog.at_level(logging.WARNING):
-            _run(root, _scaling)
-    finally:
-        holder.kill()
-        holder.wait()
+    with monkeypatch.context() as patch, caplog.at_level(logging.WARNING):
+        patch.setattr(scaling_plots, "FileLocker", _BusyLocker)
+        _run(root, _scaling)
     assert "TensorBoard is busy" in caplog.text
     assert _incumbent_steps(log_dir) == [1, 2, 3, 4, 5, 6]
 
+    # With the lock free again, the missed runs are logged, each with its frontier
     extrapolaw.analyze(root)
     assert _incumbent_steps(log_dir) == list(range(1, 13))
     assert sorted(_frontiers(log_dir)) == list(range(1, 13))
