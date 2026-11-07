@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import portalocker as pl
 from matplotlib.figure import Figure
 
 from extrapolaw.optimizers.optimizer import Artifact, ArtifactType
+from extrapolaw.state.filebased import FileLocker
 from extrapolaw.utils.pareto import pareto_efficient
 from extrapolaw.utils.power_law import fit_power_law
 
@@ -24,6 +26,9 @@ logger = logging.getLogger(__name__)
 PARETO_COLOR = "#D55E00"
 DOMINATED_COLOR = "#B0B0B0"
 COLUMNS = ["trial_id", "cost", "loss", "on_frontier"]
+TENSORBOARD_LOCK_TIMEOUT = 5.0
+"""Seconds to wait for another worker logging to TensorBoard, before trying again at
+the next update."""
 
 
 def _is_higher_better(metric: str) -> bool:
@@ -250,21 +255,84 @@ def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
     return artifacts
 
 
-def log_to_tensorboard(artifacts: Sequence[Artifact], log_dir: Path, step: int) -> None:
-    """Log the scaling figures to TensorBoard, one step per number of evaluated trials."""
-    figures = [
-        a
-        for a in artifacts
-        if a.name.startswith("scaling/") and a.artifact_type == ArtifactType.FIGURE
-    ]
-    if not figures:
-        return
-    try:
-        from torch.utils.tensorboard.writer import SummaryWriter
+def log_to_tensorboard(trials: Sequence[Trial], log_dir: Path) -> None:
+    """Log the scaling data to TensorBoard, one step per run, adding only new runs.
 
-        writer = SummaryWriter(log_dir=str(log_dir))
-        for figure in figures:
-            writer.add_figure(figure.name, figure.content, step, close=False)
-        writer.close()
+    A run's step is the order it was logged in, which is about the order the runs
+    finished. At every step:
+
+    - `scaling/incumbent/loss`: the best loss so far
+    - `scaling/frontier/...`: the runs on each Pareto frontier so far, as
+      `(trial id, value, cost)`
+
+    The ids of the logged runs are kept, in order, in `log_dir/logged_trial_ids.txt`,
+    so that later updates, other workers and `extrapolaw.analyze()` add only the new
+    runs, at the next steps.
+    It never raises: if logging fails, or another worker holds the lock for longer
+    than `TENSORBOARD_LOCK_TIMEOUT`, it warns and the runs are logged at the next
+    update.
+    """
+    finished = sorted(trials, key=lambda t: t.metadata.time_end or float("inf"))
+    try:
+        table = runs_table(finished)
+        if table.empty:
+            return
+        log_dir.mkdir(parents=True, exist_ok=True)
+        locker = FileLocker(
+            log_dir / ".tensorboard.lock", poll=0.1, timeout=TENSORBOARD_LOCK_TIMEOUT
+        )
+        with locker.lock():
+            _log_new_runs(table, log_dir)
+    except pl.exceptions.LockException:
+        logger.warning(
+            "TensorBoard is busy with another worker, the runs are logged to it at"
+            " the next update."
+        )
     except Exception as e:  # noqa: BLE001
-        logger.error(f"Failed to log the scaling plots to TensorBoard: {e}")
+        logger.warning(
+            f"Could not log the scaling data to TensorBoard, retrying at the next"
+            f" update: {e}"
+        )
+
+
+def _log_new_runs(table: pd.DataFrame, log_dir: Path) -> None:
+    """Log the runs of `table` that are not logged yet."""
+    logged_file = log_dir / "logged_trial_ids.txt"
+    logged = logged_file.read_text().split() if logged_file.exists() else []
+    is_new = ~table["trial_id"].isin(logged)
+    if not is_new.any():
+        return
+
+    from torch.utils.tensorboard.writer import SummaryWriter
+
+    writer = SummaryWriter(log_dir=str(log_dir))
+    downstream = [c for c in table.columns if c.startswith("downstream/")]
+    new = table[is_new]
+    for i, trial_id in enumerate(new["trial_id"]):
+        logged.append(trial_id)
+        step = len(logged)
+        seen = pd.concat([table[~is_new], new.iloc[: i + 1]])
+        writer.add_scalar("scaling/incumbent/loss", seen["loss"].min(), step)
+        # Every step gets its frontiers, also when it is logged late
+        for cost in _costs(table):
+            for loss in ["loss", *downstream]:
+                tag = f"scaling/frontier/{loss}_over_{cost}"
+                writer.add_text(tag, _frontier_text(seen, cost, loss), step)
+    writer.close()
+    logged_file.write_text("\n".join(logged))
+
+
+def _frontier_text(table: pd.DataFrame, cost: str, loss: str) -> str:
+    """The runs on the frontier of `loss` over `cost`, as `(trial id, value, cost)`."""
+    front = _with_frontier(table, cost, loss)
+    front = front[front["on_frontier"]].sort_values(cost)
+    values = front[loss]
+    if _is_higher_better(loss.removeprefix("downstream/")):
+        values = 1.0 - values
+    points = [
+        f"({trial_id}, {value:.4g}, {run_cost:.4g})"
+        for trial_id, value, run_cost in zip(
+            front["trial_id"], values, front[cost], strict=True
+        )
+    ]
+    return ", ".join(points)

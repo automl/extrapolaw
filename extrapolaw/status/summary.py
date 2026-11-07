@@ -299,7 +299,9 @@ class SummaryWriter:
 
         artifacts = self.collect(trials, final=final)
         self.write(artifacts)
-        log_to_tensorboard(artifacts, self.root_directory / "summary_tb", len(trials))
+        # After every evaluation, also without live plots. It has a lock of its own
+        # and never raises, so it cannot stop the run.
+        log_to_tensorboard(list(trials.values()), self.root_directory / "summary_tb")
 
     def collect(
         self,
