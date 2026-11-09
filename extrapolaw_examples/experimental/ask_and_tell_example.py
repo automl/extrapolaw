@@ -136,7 +136,9 @@ def main(parallel: int, results_dir: Path):
             result_file = results_dir / f"result_{trial.id}.json"
             if result_file.exists():
                 result = json.load(result_file.open())
-                ask_tell.tell(trial, {"objective_to_minimize": result["loss"]})
+                ask_tell.tell(
+                    trial, {"objective_to_minimize": result["loss"], "cost": 1.0}
+                )
                 del active[job_id]
                 new_trial = ask_tell.ask()
                 if new_trial:

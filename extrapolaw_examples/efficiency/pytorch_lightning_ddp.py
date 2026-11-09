@@ -91,7 +91,10 @@ def evaluate_pipeline(lr=0.1, epoch=20):
     )
     trainer.fit(model, train_dataloader, val_dataloader)
     trainer.validate(model, test_dataloader)
-    return trainer.logged_metrics["val_loss"].item()
+    return {
+        "objective_to_minimize": trainer.logged_metrics["val_loss"].item(),
+        "cost": float(epoch),
+    }
 
 
 class HPOSpace(extrapolaw.PipelineSpace):

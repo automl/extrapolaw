@@ -56,7 +56,10 @@ def evaluate_pipeline(lr=0.1, epoch=20):
     # Trainer
     trainer = L.Trainer(accelerator="cuda", strategy=FSDPStrategy(), max_epochs=epoch)
     trainer.fit(model, train_dataloader)
-    return trainer.logged_metrics["train_loss"].detach().item()
+    return {
+        "objective_to_minimize": trainer.logged_metrics["train_loss"].detach().item(),
+        "cost": float(epoch),
+    }
 
 
 if __name__ == "__main__":

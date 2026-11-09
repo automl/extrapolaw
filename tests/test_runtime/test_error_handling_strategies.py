@@ -172,10 +172,10 @@ def test_worker_does_not_raise_when_error_in_other_worker(
     class _Eval:
         do_raise: bool
 
-        def __call__(self, *args, **kwargs) -> float:  # noqa: ARG002
+        def __call__(self, *args, **kwargs) -> dict:  # noqa: ARG002
             if self.do_raise:
                 raise ValueError("This is an error")
-            return 10
+            return {"objective_to_minimize": 10, "cost": 1.0}
 
     evaler = _Eval(do_raise=True)
 

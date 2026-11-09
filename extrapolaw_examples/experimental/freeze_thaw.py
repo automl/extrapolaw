@@ -146,7 +146,10 @@ def training_pipeline(
     #     },
     # )
 
-    return val_err
+    return {
+        "objective_to_minimize": val_err,
+        "cost": float(epochs - start_epoch + 1), 
+    }
 
 
 if __name__ == "__main__":

@@ -81,14 +81,17 @@ class NN_Space(extrapolaw.PipelineSpace):
     )
 
 
-def evaluate_pipeline(model: torch.nn.Module, batch_size: int) -> float:
+def evaluate_pipeline(model: torch.nn.Module, batch_size: int) -> dict:
     # For demonstration, we return a dummy objective value
     # In practice, you would train and evaluate the model here
     x = torch.ones(size=[1, 3, 220, 220])
     result = np.sum(model(x).detach().numpy().flatten())
 
     objective_value = batch_size * result  # Dummy computation
-    return objective_value
+    return {
+        "objective_to_minimize": objective_value,
+        "cost": 1.0,  # The training cost of this run, e.g. its FLOPs
+    }
 
 
 if __name__ == "__main__":

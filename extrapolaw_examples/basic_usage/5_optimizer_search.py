@@ -76,7 +76,7 @@ class OptimizerSpace(extrapolaw.PipelineSpace):
 
 
 # In the pipeline, we optimize a simple quadratic function using the sampled optimizer
-def evaluate_pipeline(optimizer_class) -> float:
+def evaluate_pipeline(optimizer_class) -> dict:
     x = torch.ones(size=[1], requires_grad=True)
     optimizer = optimizer_class([x])
 
@@ -86,8 +86,11 @@ def evaluate_pipeline(optimizer_class) -> float:
         y = x**2 + 2 * x + 1
         y.backward()
         optimizer.step()
-
-    return y.item()
+        
+    return {
+        "objective_to_minimize": y.item(),
+        "cost": 10.0,  # The training cost of this run, here its number of steps
+    }
 
 
 # Run Extrapolaw with the defined pipeline and space and show the best configuration

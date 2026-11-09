@@ -15,7 +15,10 @@ def evaluate_pipeline(pipeline_directory: Path, float1, categorical, integer1):
     pipeline_info.write_text(f"{float1} - {categorical} - {integer1}")
 
     objective_to_minimize = -float(np.sum([float1, int(categorical), integer1]))
-    return objective_to_minimize
+    return {
+        "objective_to_minimize": objective_to_minimize,
+        "cost": 1.0,  # The training cost of this run, e.g. its FLOPs
+    }
 
 
 class HPOSpace(extrapolaw.PipelineSpace):

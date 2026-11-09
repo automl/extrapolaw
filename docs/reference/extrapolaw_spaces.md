@@ -138,9 +138,9 @@ def evaluate_pipeline(
         torch.nn.Linear(in_features=hidden_layer.out_features, out_features=10)
     )
 
-    # Use the model for training and return the validation accuracy
+    # Use the model for training and return the validation error and training cost
     model.train(batch_size=batch_size, ...)
-    return model.evaluate(...).accuracy
+    return {"objective_to_minimize": 1 - model.evaluate(...).accuracy, "cost": flops}
 
 ```
 
@@ -191,9 +191,9 @@ class CNN_Space(extrapolaw.PipelineSpace):
     )
 
 def evaluate_pipeline(cnn: torch.nn.Module):
-    # Use the cnn model for training and return the validation accuracy
+    # Use the cnn model for training and return the validation error and training cost
     cnn.train(...)
-    return cnn.evaluate(...).accuracy
+    return {"objective_to_minimize": 1 - cnn.evaluate(...).accuracy, "cost": flops}
 ```
 
 ??? info "Self- and future references"

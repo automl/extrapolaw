@@ -19,7 +19,7 @@ def _single_objective(x: float) -> dict:
 
 
 def _two_objectives(x: float) -> dict:
-    return {"objective_to_minimize": [x, 1 - x]}
+    return {"objective_to_minimize": [x, 1 - x], "cost": 1.0}
 
 
 def _run(root: Path, evaluate_pipeline: object, *, live_plots: bool) -> None:

@@ -71,7 +71,8 @@ def evaluate_pipeline(lr: float, alpha: int, optimizer: str, width: int):
 
     # Train and evaluate the model with your training pipeline
     validation_error = train_and_eval(model)
-    return validation_error
+    # The training cost comes from `estimate_flops` below
+    return {"objective_to_minimize": validation_error}
 
 
 # 2. Define a search space of parameters; use the same parameter names as in evaluate_pipeline

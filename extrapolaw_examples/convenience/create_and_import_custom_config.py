@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # The created configuration can then be used as an imported trial in Extrapolaw optimizers.
     # We demonstrate this with the fictional result of objective_to_minimize = 0.5
     extrapolaw.import_trials(
-        evaluated_trials=[(config, extrapolaw.UserResultDict(objective_to_minimize=0.5))],
+        evaluated_trials=[(config, extrapolaw.UserResultDict(objective_to_minimize=0.5, cost=1.0))],
         root_directory="results/created_config_example",
         pipeline_space=ExampleSpace(),
         overwrite_root_directory=True,

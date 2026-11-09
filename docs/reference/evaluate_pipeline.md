@@ -1,7 +1,7 @@
 # The `evaluate_pipeline` function
 
 > **TL;DR**
-> *Sync*: return a scalar or a dict ⟶ Extrapolaw records it automatically.
+> *Sync*: return a dict with at least the loss and the training cost ⟶ Extrapolaw records it automatically.
 > *Async*: return `None`, launch a job, and call `extrapolaw.save_pipeline_results()` when the job finishes.
 > *Plots*: pass `live_plots=True` to `extrapolaw.acquire()` (sync) or to `extrapolaw.save_pipeline_results()` (async) to redraw them after every result.
 
@@ -9,25 +9,47 @@
 
 ## 1 Return types
 
-| Allowed return | When to use                                 | Minimal example                              |
-| -------------- | ------------------------------------------- | -------------------------------------------- |
-| **Scalar**     | simple objective, single fidelity           | `return loss`                                |
-| **Dict**       | need cost/extra metrics                     | `{"objective_to_minimize": loss, "cost": 3}` |
-| **`None`**     | you launch the job elsewhere (SLURM, k8s …) | *see § 3 Async*                              |
+| Allowed return  | When to use                                 | Minimal example                                  |
+| --------------- | ------------------------------------------- | ------------------------------------------------ |
+| **Dict**        | every evaluation                            | `{"objective_to_minimize": loss, "cost": flops}` |
+| **`None`**      | you launch the job elsewhere (SLURM, k8s …) | *see Async below*                                |
+| **Exception**   | the evaluation failed (raise or return it)  | `raise RuntimeError("diverged")`                 |
 
-All other values raise a `TypeError` inside Extrapolaw.
+A plain number is not enough for a scaling study, so any other value, a single
+float included, stops the run with a `ValueError`. Only with a `cost_estimator`
+passed to `extrapolaw.acquire()` may you return just the loss, Extrapolaw then adds
+the estimated cost.
 
 ## 2 Result dictionary keys
 
-| key                     | purpose                                                                      | required?                     |
-| ----------------------- | ---------------------------------------------------------------------------- | ----------------------------- |
-| `objective_to_minimize` | scalar Extrapolaw will minimise                                                    | **yes**                       |
-| `cost`                  | wall‑clock, GPU‑hours, … —  Stopping criterion when passed `total_cost_to_spend` to `extrapolaw.acquire` | yes *iff* cost budget enabled |
-| `learning_curve`        | list/np.array of intermediate objectives                                     | optional                      |
-| `extra`                 | any JSON‑serialisable blob                                                   | optional                      |
-| `exception`                 | any Exception illustrating the error in evaluation                                                   | optional                      |
+| key                       | purpose                                                                                          | required?                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| `objective_to_minimize`   | the loss Extrapolaw minimises                                                                    | **yes**                                        |
+| `cost`                    | the training cost, e.g. FLOPs; also counts towards `total_cost_to_spend`                         | **yes**, unless a `cost_estimator` provides it |
+| `inference_cost`          | the cost of using the model once, e.g. the FLOPs of one forward pass; the scaling plots are also drawn over it | optional                         |
+| `n_params`                | the model size; used by `extrapolaw.predict()`                                                   | optional                                       |
+| `n_data`                  | the amount of training data, e.g. tokens, samples or table cells; used by `extrapolaw.predict()` | optional                                       |
+| `downstream_performances` | the model's performance on downstream tasks, by name, e.g. `{"hellaswag_acc": 0.41}`; each gets its own scaling plot | optional                   |
+| `learning_curve`          | list of intermediate objectives                                                                  | optional                                       |
+| `info_dict`               | any YAML‑serialisable dict, saved as `extra` in the trial’s `report.yaml`                        | optional                                       |
+| `exception`               | an exception describing a failed evaluation                                                      | optional                                       |
 
-> **Tip**  Return exactly what you need; extra keys are preserved in the trial’s `report.yaml`.
+```python
+def evaluate_pipeline(width: int, n_steps: int, learning_rate: float) -> dict:
+    ...  # train the model
+    return {
+        "objective_to_minimize": val_loss,
+        "cost": 6 * n_params * n_tokens,  # training FLOPs
+        "inference_cost": 2 * n_params,  # FLOPs of one forward pass
+        "n_params": n_params,
+        "n_data": n_tokens,
+        "downstream_performances": {"val_acc": val_acc},
+    }
+```
+
+Metrics whose name contains `_acc` or `recall` count as higher-is-better and are
+plotted as `1 - value`, so that lower is better in every scaling plot. See
+[Scaling plots](analyse.md#scaling-plots) for what is drawn from these values.
 
 > **Live plots**  When `evaluate_pipeline` returns its result (sync), the worker records it
 > and refreshes `root_directory/summary/`. Pass `live_plots=True` to `extrapolaw.acquire()` to also

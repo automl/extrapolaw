@@ -39,12 +39,12 @@ class Space2(PipelineSpace):
 
 def eval_fn1(**config):
     """Evaluation function for TestSpace1."""
-    return config["x"] + config["y"]
+    return {"objective_to_minimize": config["x"] + config["y"], "cost": 1.0}
 
 
 def eval_fn2(**config):
     """Evaluation function for TestSpace2."""
-    return config["a"] + config["b"]
+    return {"objective_to_minimize": config["a"] + config["b"], "cost": 1.0}
 
 
 def test_error_on_mismatched_search_space(tmp_path: Path):

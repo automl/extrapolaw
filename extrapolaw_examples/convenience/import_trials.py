@@ -26,7 +26,7 @@ def get_evaluate_pipeline_func(optimizer):
 
             def evaluate_pipeline_MO(float1, float2, **kwargs):
                 objective_to_minimize = [float1 - 0.3, float2 - 3.6]
-                return objective_to_minimize
+                return {"objective_to_minimize": objective_to_minimize, "cost": 1.0}
 
             evaluate_pipeline = evaluate_pipeline_MO
 
@@ -36,7 +36,7 @@ def get_evaluate_pipeline_func(optimizer):
                 objective_to_minimize = abs(float1) / abs(
                     float(np.sum([float1, float2, int(categorical), integer1, integer2]))
                 )
-                return objective_to_minimize
+                return {"objective_to_minimize": objective_to_minimize, "cost": 1.0}
 
             evaluate_pipeline = evaluate_pipeline_IFBO
 
@@ -48,7 +48,7 @@ def get_evaluate_pipeline_func(optimizer):
                 objective_to_minimize = -float(
                     np.sum([float1, float2, int(categorical), integer1, integer2])
                 )
-                return objective_to_minimize
+                return {"objective_to_minimize": objective_to_minimize, "cost": 1.0}
 
             evaluate_pipeline = evaluate_pipeline_default
 
@@ -71,7 +71,7 @@ def get_evaluated_trials(optimizer) -> list[tuple[dict[str, Any], UserResultDict
         "SAMPLING__Resolvable.integer1::integer__0_1_False": 1,
         "SAMPLING__Resolvable.integer2::integer__1_1000_True": 5,
     }
-    base_result = UserResultDict(objective_to_minimize=-1011.5417078469603)
+    base_result = UserResultDict(objective_to_minimize=-1011.5417078469603, cost=1.0)
 
     # Mapping of optimizers to their evaluated trials
     trials_map = {
@@ -82,19 +82,20 @@ def get_evaluated_trials(optimizer) -> list[tuple[dict[str, Any], UserResultDict
             (
                 classic_base_config,
                 UserResultDict(
-                    objective_to_minimize=[0.5417078469603, 3.3333333333333335]
+                    objective_to_minimize=[0.5417078469603, 3.3333333333333335],
+                    cost=1.0,
                 ),
             ),
             (
                 {**classic_base_config, "float2": 3.6},
-                UserResultDict(objective_to_minimize=[0.2417078469603, 3.6]),
+                UserResultDict(objective_to_minimize=[0.2417078469603, 3.6], cost=1.0),
             ),
         ],
         "ifbo": [
-            (classic_base_config, UserResultDict(objective_to_minimize=0.5417078469603)),
+            (classic_base_config, UserResultDict(objective_to_minimize=0.5417078469603, cost=1.0)),
             (
                 {**classic_base_config, "float2": 3.6},
-                UserResultDict(objective_to_minimize=0.2417078469603),
+                UserResultDict(objective_to_minimize=0.2417078469603, cost=1.0),
             ),
         ],
         "hyperband": [
@@ -118,7 +119,7 @@ def get_evaluated_trials(optimizer) -> list[tuple[dict[str, Any], UserResultDict
                     "integer1": 0,
                     "integer2": 1000,
                 },
-                {"objective_to_minimize": -1011.5417078469603},
+                {"objective_to_minimize": -1011.5417078469603, "cost": 1.0},
             ),
         ],
         "async_hb": [(classic_base_config, base_result)],

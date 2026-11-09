@@ -88,7 +88,7 @@ class ZDT1FidelitySpace(extrapolaw.PipelineSpace):
 
 def evaluate_pipeline(x0: float, x1: float, x2: float, fidelity: int) -> dict:
     f1, f2 = zdt1_multi_fidelity([x0, x1, x2], fidelity)
-    return dict(objective_to_minimize=[f1, f2])
+    return dict(objective_to_minimize=[f1, f2], cost=float(fidelity))
 
 
 # ## Expert Priors per Objective, with PriMO

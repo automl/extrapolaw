@@ -109,8 +109,8 @@ def test_default_values_on_not_specified(
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
-        return 1.0
+    def eval_function(*args, **kwargs) -> dict:
+        return {"objective_to_minimize": 1.0}  # The cost is the default
 
     worker = DefaultWorker.new(
         state=extrapolaw_state,
@@ -161,8 +161,8 @@ def test_default_value_objective_to_minimize_curve_take_objective_to_minimize_va
 
     LOSS = 1.0
 
-    def eval_function(*args, **kwargs) -> float:
-        return LOSS
+    def eval_function(*args, **kwargs) -> dict:
+        return {"objective_to_minimize": LOSS, "cost": 1.0}
 
     worker = DefaultWorker.new(
         state=extrapolaw_state,

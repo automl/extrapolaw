@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO)
 
 def evaluate_pipeline(
     learning_rate: float, optimizer: str, num_neurons: int, epochs: int = 10, **kwargs
-) -> float:
+) -> dict:
     """Simulated training function.
 
     In practice, this trains a real neural network and returns validation loss.
@@ -79,7 +79,7 @@ def evaluate_pipeline(
         + np.random.normal(0, 0.02)
     )
 
-    return max(0.1, loss)
+    return {"objective_to_minimize": max(0.1, loss), "cost": float(epochs)}
 
 
 # ## Technique 1: Multi-Fidelity Optimization

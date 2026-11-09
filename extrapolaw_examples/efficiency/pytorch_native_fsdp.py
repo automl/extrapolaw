@@ -207,7 +207,10 @@ def evaluate_pipeline(lr=0.1, epoch=20):
     )
 
     loss = test_loss_tensor.item()
-    return loss
+    return {
+        "objective_to_minimize": loss,
+        "cost": float(epoch),
+    }
 
 
 if __name__ == "__main__":

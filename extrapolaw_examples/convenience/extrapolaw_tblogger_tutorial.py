@@ -301,12 +301,13 @@ def evaluate_pipeline(lr, optim, weight_decay):
     # Return a dictionary with relevant metrics and information.
     return {
         "objective_to_minimize": objective_to_minimize,
+        "cost": max_epochs,
         "info_dict": {
             "train_accuracy": train_accuracy,
             "test_accuracy": test_accuracy,
-            "cost": max_epochs,
         },
     }
+
 
 
 #############################################################

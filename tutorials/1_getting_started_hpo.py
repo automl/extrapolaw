@@ -44,7 +44,7 @@ def branin(x1, x2):
     t = 1 / (8 * math.pi)
 
     f = a * (x2 - b * x1**2 + c * x1 - r) ** 2 + s * (1 - t) * math.cos(x1) + s
-    return f
+    return {"objective_to_minimize": f, "cost": 1.0}
 
 # Define the search space and run optimization
 class BraninSpace(extrapolaw.PipelineSpace):

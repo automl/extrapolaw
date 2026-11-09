@@ -131,18 +131,20 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
         evaluate_pipeline: The objective function to minimize. This will be called
             with a configuration from the `pipeline_space=` that you define.
 
-            The function should return one of the following:
-
-            * A `float`, which is the objective value to minimize.
-            * A `dict` which can have the following keys:
+            The function should return a `dict` with the following keys:
 
                 ```python
                 {
                     "objective_to_minimize": float,  # The thing to minimize (required)
-                    "cost": float,  # The cost of the evaluate_pipeline, used by some algorithms
+                    "cost": float,  # The training cost, e.g. FLOPs (required, unless `cost_estimator` gives it)
+                    "inference_cost": float,  # The cost of using the model once (optional)
+                    "n_params": float,  # The model size (optional)
+                    "n_data": float,  # The amount of training data, e.g. tokens (optional)
+                    "downstream_performances": dict,  # Name to value (optional)
                     "info_dict": dict,  # Any additional information you want to store, should be YAML serializable
                 }
                 ```
+            With a `cost_estimator`, returning just the loss as a `float` also works.
 
             ??? note "`str` usage for dynamic imports"
 

@@ -80,12 +80,14 @@ class NN_Space(extrapolaw.PipelineSpace):
 
 
 # Defining the pipeline, using the model from the NN_space space as callable
-def evaluate_pipeline(model: torch.nn.Module) -> float:
+def evaluate_pipeline(model: torch.nn.Module) -> dict:
     x = torch.ones(size=[1, 3, 220, 220])
     result = np.sum(model(x).detach().numpy().flatten())
-
-    return result
-
+    
+    return {
+        "objective_to_minimize": result,
+        "cost": 1.0,  # The training cost of this run, e.g. its FLOPs
+    }
 
 if __name__ == "__main__":
     # Run Extrapolaw with the defined pipeline and space and show the best configuration

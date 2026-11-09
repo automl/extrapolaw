@@ -18,9 +18,10 @@ from extrapolaw.space.extrapolaw_spaces.parameters import (
 )
 
 
-def simple_evaluation(learning_rate: float, num_layers: int, optimizer: str) -> float:
+def simple_evaluation(learning_rate: float, num_layers: int, optimizer: str) -> dict:
     """Simple evaluation function."""
-    return learning_rate * num_layers + (0.1 if optimizer == "adam" else 0.2)
+    loss = learning_rate * num_layers + (0.1 if optimizer == "adam" else 0.2)
+    return {"objective_to_minimize": loss, "cost": 1.0}
 
 
 def test_searchspace_is_rejected():

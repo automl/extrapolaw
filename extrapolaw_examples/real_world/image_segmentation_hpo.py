@@ -130,7 +130,10 @@ def evaluate_pipeline(**kwargs):
     )
     trainer.fit(model, data)
     val_loss = trainer.logged_metrics["val_loss"].detach().item()
-    return val_loss
+    return {
+        "objective_to_minimize": val_loss,
+        "cost": float(kwargs.get("epoch", 30)),
+    }
 
 
 class SegmentationSpace(extrapolaw.PipelineSpace):

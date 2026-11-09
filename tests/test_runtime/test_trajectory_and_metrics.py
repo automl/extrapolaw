@@ -52,6 +52,7 @@ def simple_evaluation(x: float, y: int) -> dict:
     """Simple evaluation function that returns multiple metrics."""
     return {
         "objective_to_minimize": x + y,
+        "cost": 1.0,
         "accuracy": max(0.0, 1.0 - (x + y) / 11.0),  # Dummy accuracy metric
         "training_time": x * 10 + y,  # Dummy training time
         "memory_usage": y * 100,  # Dummy memory usage
@@ -68,6 +69,7 @@ def fidelity_evaluation(x: float, y: int, epochs: int) -> dict:
         "objective_to_minimize": (
             base_objective / fidelity_factor
         ),  # Better with more epochs
+        "cost": float(epochs),
         "accuracy": min(1.0, fidelity_factor * (1.0 - base_objective / 11.0)),
         "training_time": epochs * (x * 10 + y),  # More epochs = more time
         "memory_usage": y * 100 + epochs * 10,  # Memory increases with epochs
@@ -83,6 +85,7 @@ def failing_evaluation(x: float, y: int) -> dict:
 
     return {
         "objective_to_minimize": x + y,
+        "cost": 1.0,
         "success_rate": 1.0,
     }
 

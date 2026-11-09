@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from extrapolaw.optimizers.optimizer import Artifact, ArtifactType
 from extrapolaw.plot.generic_plots import plot_incumbent_trajectory, plot_pareto_front
+from extrapolaw.plot.scaling_plots import log_to_tensorboard, plot_scaling
 from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import ExtrapolawCompatConverter
 from extrapolaw.state.extrapolaw_state import ExtrapolawState, _deserialize_optimizer_info
 from extrapolaw.state.trial import Trial
@@ -296,7 +297,9 @@ class SummaryWriter:
             )
             trials = state._trial_repo.get_valid_evaluated_trials(refresh_cache=False)
 
-        self.write(self.collect(trials, final=final))
+        artifacts = self.collect(trials, final=final)
+        self.write(artifacts)
+        log_to_tensorboard(list(trials.values()), self.root_directory / "summary_tb")
 
     def collect(
         self,
@@ -454,7 +457,9 @@ class SummaryWriter:
         n_objectives = len(_to_sequence(trials[0].report.objective_to_minimize))  # type: ignore[arg-type]
         try:
             if n_objectives == 1:
-                return plot_incumbent_trajectory(trials, cumulative_usage, incumbent_ids)
+                return plot_incumbent_trajectory(
+                    trials, cumulative_usage, incumbent_ids
+                ) + plot_scaling(trials)
             if n_objectives == 2:
                 return plot_pareto_front(trials, pareto_ids)
         except Exception as e:  # noqa: BLE001
