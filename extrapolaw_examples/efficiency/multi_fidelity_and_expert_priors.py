@@ -9,8 +9,10 @@ import extrapolaw
 
 def evaluate_pipeline(float1, float2, integer1, fidelity):
     objective_to_minimize = -float(np.sum([float1, float2, integer1])) / fidelity
-    return objective_to_minimize
-
+    return {
+        "objective_to_minimize": objective_to_minimize,
+        "cost": float(fidelity),
+    }
 
 class HPOSpace(extrapolaw.PipelineSpace):
     float1 = extrapolaw.Float(

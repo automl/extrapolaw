@@ -121,6 +121,11 @@ def rows_from_trials(
             if data_parameter_name is not None
             else extra.get("n_data")
         )
+        # The values the run reported come first
+        if report.n_params is not None:
+            n_params = report.n_params
+        if report.n_data is not None:
+            n_data = report.n_data
         n_params = _nan_float(n_params)
         rows.append((n_params, _nan_float(n_data), loss, _nan_float(flops)))
         configs.append(config)

@@ -331,9 +331,9 @@ def test_optimizers_work_roughly(
     for _ in range(20):
         trial = ask_and_tell.ask()
         if key in REQUIRES_FIDELITY_MO:
-            ask_and_tell.tell(trial, [1.0, 2.0])
+            ask_and_tell.tell(trial, {"objective_to_minimize": [1.0, 2.0], "cost": 1.0})
         else:
-            ask_and_tell.tell(trial, 1.0)
+            ask_and_tell.tell(trial, {"objective_to_minimize": 1.0, "cost": 1.0})
 
 
 @fixture

@@ -40,7 +40,7 @@ def hyperparameter_pipeline_to_optimize(
     objective_to_minimize = -float(float1 + float2 + categorical + integer1 + integer2)
     assert isinstance(objective_to_minimize, float)
 
-    return objective_to_minimize
+    return {"objective_to_minimize": objective_to_minimize, "cost": 1.0}
 
 
 class DemoHyperparameterSpace(PipelineSpace):
@@ -274,7 +274,7 @@ def operation_pipeline_to_optimize(model: Model, some_hp: str):
     objective_to_minimize = model(values)
     assert isinstance(objective_to_minimize, float)
 
-    return objective_to_minimize
+    return {"objective_to_minimize": objective_to_minimize, "cost": 1.0}
 
 
 class DemoOperationSpace(PipelineSpace):
@@ -540,6 +540,7 @@ def test_trajectory_and_metrics(tmp_path):
         """Evaluation function that returns multiple metrics."""
         return {
             "objective_to_minimize": x + y,
+            "cost": 1.0,
             "accuracy": 1.0 - (x + y) / 11.0,  # Dummy accuracy metric
             "training_time": x * 10,  # Dummy training time
             "memory_usage": y * 100,  # Dummy memory usage

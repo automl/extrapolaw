@@ -38,8 +38,8 @@ def evaluate(config):
     return config["a"] * 2 + config["b"]
 loss = evaluate(config)
 
-# Tell the optimizer the result
-my_optimizer.tell(config_id, loss)
+# Tell the optimizer the result, with the training cost
+my_optimizer.tell(config_id, {"objective_to_minimize": loss, "cost": 1.0})
 ```
 
 Importantly, we expose a little more of the information that is normally
@@ -56,7 +56,7 @@ an optimizer with previous results:
 optimizer.tell_custom(
     config_id="my_config_id",  # Make sure to give it a unique id
     config={"a": 1, "b": 2},
-    result={"objective_to_minimize": 0.5},  # The same as the return evaluate_pipeline
+    result={"objective_to_minimize": 0.5, "cost": 1.0},  # As from evaluate_pipeline
 )
 ```
 
@@ -194,8 +194,8 @@ class AskAndTell:
         Args:
             config_id: The id of the configuration.
             config: The configuration.
-            result: The result of the evaluation. This can be an exception,
-                a float, or a mapping of values, similar to that which
+            result: The result of the evaluation. This can be an exception
+                or a mapping of values, the same as that which
                 you would return from `evaluate_pipeline` when your normally
                 call [`extrapolaw.acquire()`][extrapolaw.api.acquire].
             time_sampled: The time the configuration was sampled.
@@ -263,6 +263,8 @@ class AskAndTell:
             tb=traceback_str,
             inference_cost=parsed_result.inference_cost,
             downstream_performances=parsed_result.downstream_performances,
+            n_params=parsed_result.n_params,
+            n_data=parsed_result.n_data,
         )
         self.trials[config_id] = trial
         return trial
@@ -281,8 +283,8 @@ class AskAndTell:
         Args:
             trial: The trial to report the result for. This can be either
                 the trial id (a string) or the trial object itself.
-            result: The result of the evaluation. This can be an exception,
-                a float, or a mapping of values, similar to that which
+            result: The result of the evaluation. This can be an exception
+                or a mapping of values, the same as that which
                 you would return from `evaluate_pipeline` when your normally
                 call [`extrapolaw.acquire()`][extrapolaw.api.acquire].
             time_end: The time the configuration was finished being evaluated.
@@ -331,5 +333,7 @@ class AskAndTell:
             tb=traceback_str,
             inference_cost=parsed_result.inference_cost,
             downstream_performances=parsed_result.downstream_performances,
+            n_params=parsed_result.n_params,
+            n_data=parsed_result.n_data,
         )
         return _trial

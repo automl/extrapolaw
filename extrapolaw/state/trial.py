@@ -68,6 +68,8 @@ class Report:  # noqa: PLW1641
     evaluation_duration: float | None
     inference_cost: float | None = None
     downstream_performances: dict[str, float] = field(default_factory=dict)
+    n_params: float | None = None
+    n_data: float | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.err, str):
@@ -224,6 +226,8 @@ class Trial:
         evaluation_duration: float | None,
         inference_cost: float | None = None,
         downstream_performances: dict[str, float] | None = None,
+        n_params: float | None = None,
+        n_data: float | None = None,
     ) -> Report:
         """Set the report for the trial."""
         if report_as == "success":
@@ -249,6 +253,8 @@ class Trial:
             tb=tb,
             inference_cost=inference_cost,
             downstream_performances=dict(downstream_performances or {}),
+            n_params=n_params,
+            n_data=n_data,
         )
 
     def set_corrupted(self) -> None:

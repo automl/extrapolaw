@@ -883,6 +883,8 @@ def _save_results(
         evaluation_duration=result.cost,
         inference_cost=result.inference_cost,
         downstream_performances=result.downstream_performances,
+        n_params=result.n_params,
+        n_data=result.n_data,
     )
 
     worker_id = trial.metadata.evaluating_worker_id

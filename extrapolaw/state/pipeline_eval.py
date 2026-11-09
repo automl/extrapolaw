@@ -25,20 +25,26 @@ class UserResultDict(TypedDict, total=False):
     """The type of things you can include when returning
     a dictionary from `evaluate_pipeline`.
 
-    All fields here are optional. If an exception is provided,
-    we count the trial as having failed. Otherwise, we rely
-    on at least `objective_to_minimize` to be provided.
+    `objective_to_minimize` and `cost` are required, the other fields are optional.
+    If an exception is provided, we count the trial as having failed.
     """
 
     objective_to_minimize: float | Sequence[float] | None
     """The objective value to minimize, single or multi-objective"""
 
     cost: float | None
-    """The cost of the evaluation, if any"""
+    """The training cost of the evaluation, e.g. its FLOPs. Required, unless a
+    `cost_estimator` is passed to `extrapolaw.acquire()`."""
 
     inference_cost: float | None
     """The cost of using the trained model once, e.g. the FLOPs of one forward pass.
     The scaling plots are also drawn over it."""
+
+    n_params: float | None
+    """The number of parameters of the model."""
+
+    n_data: float | None
+    """The amount of training data, e.g. the number of tokens."""
 
     downstream_performances: Mapping[str, float] | None
     """The model's performance on downstream tasks, by name, e.g.
@@ -61,14 +67,9 @@ class UserResultDict(TypedDict, total=False):
     """Extra information that will be stored with the trials result."""
 
 
-EvaluatePipelineReturn: TypeAlias = (
-    Exception | float | Sequence[float] | UserResultDict | dict
-)
+EvaluatePipelineReturn: TypeAlias = Exception | UserResultDict | dict
 """The type of things `evaluate_pipeline` can return.
 
-* `float`: Interpreted as just the objective value to minimize.
-* `Sequence[float]`: Interpreted as multiobjective optimization with these values.
-    Order is important.
 * `Exception`: The evaluation failed.
 * `Mapping[str, Any]`: A dict which follows the layout of
     [`UserResultDict`][extrapolaw.state.pipeline_eval.EvaluatePipelineReturn].
@@ -91,6 +92,8 @@ class UserResult:
     exception: Exception | None = None
     inference_cost: float | None = None
     downstream_performances: dict[str, float] = field(default_factory=dict)
+    n_params: float | None = None
+    n_data: float | None = None
 
     def __post_init__(self) -> None:  # noqa: C901, PLR0912, PLR0915
         # This is the type that we will use to profliferate to the rest of Extrapolaw.
@@ -189,6 +192,28 @@ class UserResult:
                         f" floats. Got {self.downstream_performances}"
                     )
 
+            match self.n_params:
+                case np.number() | float() | int():
+                    self.n_params = float(self.n_params)
+                case None:
+                    pass
+                case _:
+                    raise ValueError(
+                        "The 'n_params' should be either a float or None."
+                        f" Got {self.n_params}"
+                    )
+
+            match self.n_data:
+                case np.number() | float() | int():
+                    self.n_data = float(self.n_data)
+                case None:
+                    pass
+                case _:
+                    raise ValueError(
+                        "The 'n_data' should be either a float or None."
+                        f" Got {self.n_data}"
+                    )
+
         except Exception as e:
             raise ValueError(f"Failed to parse the result {self}.") from e
 
@@ -219,56 +244,6 @@ class UserResult:
         exception: Exception | None
 
         match user_result:
-            # Start easy, single objective result only
-            case int() | float() | np.number():
-                match default_learning_curve:
-                    case "objective_to_minimize":  # Take the obj_to_minimize as the curve
-                        learning_curve = [float(user_result)]
-                    case None | Sequence():  # Go with the default (list or None)
-                        learning_curve = default_learning_curve  # type: ignore
-                    case _:
-                        raise ValueError(
-                            "The default learning curve should be either None or"
-                            f" 'objective_to_minimize'. Got {default_learning_curve}"
-                        )
-
-                return UserResult(
-                    objective_to_minimize=user_result,
-                    learning_curve=learning_curve,
-                    cost=default_cost_value,
-                    exception=None,
-                    extra={},
-                )
-
-            # Multiobjective result
-            case Sequence():
-                if not all(isinstance(v, float | int | np.number) for v in user_result):
-                    val_types = ", ".join(f"{v}: {type(v)}" for v in user_result)
-                    raise ValueError(
-                        "All values in the multiobjective result should be floats,"
-                        f" but got {val_types}"
-                    )
-                objective_to_minimize = [float(v) for v in user_result]
-
-                match default_learning_curve:
-                    case "objective_to_minimize":
-                        learning_curve = [objective_to_minimize]
-                    case None | Sequence():
-                        learning_curve = default_learning_curve  # type: ignore
-                    case _:
-                        raise ValueError(
-                            "The default learning curve should be either None or"
-                            f" 'objective_to_minimize'. Got {default_learning_curve}"
-                        )
-
-                return UserResult(
-                    objective_to_minimize=objective_to_minimize,
-                    extra={},
-                    cost=default_cost_value,
-                    learning_curve=learning_curve,
-                    exception=None,
-                )
-
             # An Error
             case Exception():
                 objective_to_minimize = default_objective_to_minimize_value
@@ -338,6 +313,12 @@ class UserResult:
                             "The 'cost' should be either a float or None."
                             f" Got {popped_cost}"
                         )
+                # A successful evaluation needs its training cost
+                if exception is None and cost is None:
+                    raise ValueError(
+                        "The result has no 'cost'. Return the training cost, e.g. its"
+                        " FLOPs, or pass a `cost_estimator` to `extrapolaw.acquire()`."
+                    )
 
                 # Learning curve is annoying as we have a cross product of possible
                 # learning curve returns and what to do if there is a default.
@@ -398,12 +379,15 @@ class UserResult:
                     inference_cost=_result.pop("inference_cost", None),
                     downstream_performances=_result.pop("downstream_performances", None)
                     or {},
+                    n_params=_result.pop("n_params", None),
+                    n_data=_result.pop("n_data", None),
                 )
 
             case _:
                 raise ValueError(
-                    "The user result should be either a float, a sequence of floats,"
-                    f" an exception or a dictionary. Got {user_result}"
+                    "The result should be a dictionary with at least"
+                    " 'objective_to_minimize' and 'cost', or an exception."
+                    f" Got {user_result}"
                 )
 
 
@@ -468,6 +452,8 @@ def _eval_trial(
             evaluation_duration=duration,
             inference_cost=result.inference_cost,
             downstream_performances=result.downstream_performances,
+            n_params=result.n_params,
+            n_data=result.n_data,
         )
 
     return report

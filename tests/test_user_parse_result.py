@@ -23,43 +23,6 @@ EXCEPTION = Exception("")
 @pytest.mark.parametrize(
     ("inp", "defaults", "expected"),
     [
-        # Float
-        (1.0, d(), UserResult(objective_to_minimize=1.0)),
-        (np.float64(4.5), d(), UserResult(objective_to_minimize=4.5)),
-        (float("inf"), d(), UserResult(objective_to_minimize=float("inf"))),
-        (
-            1.0,
-            d(cost=2.0, lc=[5.0]),
-            UserResult(objective_to_minimize=1.0, cost=2.0, learning_curve=[5.0]),
-        ),
-        (
-            1.0,
-            d(lc="objective_to_minimize"),
-            UserResult(objective_to_minimize=1.0, learning_curve=[1.0]),
-        ),
-        # Multiobjective
-        (
-            [1.0, 2.0],
-            d(),
-            UserResult(objective_to_minimize=[1.0, 2.0]),
-        ),
-        (
-            [1.0, 2.0],
-            d(cost=2.0, lc=[5.0, 6.0]),
-            UserResult(
-                objective_to_minimize=[1.0, 2.0],
-                cost=2.0,
-                learning_curve=[5.0, 6.0],
-            ),
-        ),
-        (
-            [1.0, 2.0],
-            d(lc="objective_to_minimize"),
-            UserResult(
-                objective_to_minimize=[1.0, 2.0],
-                learning_curve=[[1.0, 2.0]],
-            ),
-        ),
         # Exception
         (
             EXCEPTION,
@@ -81,14 +44,21 @@ EXCEPTION = Exception("")
                 exception=EXCEPTION,
             ),
         ),
-        # Mappings, the hard ones
-        # We first duplicate all the above test in dict form.
-        # The we proceed to mapping specific ones
-        ({"objective_to_minimize": 1.0}, d(), UserResult(objective_to_minimize=1.0)),
+        # Mappings
         (
-            {"objective_to_minimize": float("inf")},
+            {"objective_to_minimize": 1.0, "cost": 2.0},
             d(),
-            UserResult(objective_to_minimize=float("inf")),
+            UserResult(objective_to_minimize=1.0, cost=2.0),
+        ),
+        (
+            {"objective_to_minimize": np.float64(4.5), "cost": 2},
+            d(),
+            UserResult(objective_to_minimize=4.5, cost=2.0),
+        ),
+        (
+            {"objective_to_minimize": float("inf"), "cost": 2.0},
+            d(),
+            UserResult(objective_to_minimize=float("inf"), cost=2.0),
         ),
         (
             {"objective_to_minimize": 1.0},
@@ -96,15 +66,15 @@ EXCEPTION = Exception("")
             UserResult(objective_to_minimize=1.0, cost=2.0, learning_curve=[5.0]),
         ),
         (
-            {"objective_to_minimize": 1.0},
+            {"objective_to_minimize": 1.0, "cost": 2.0},
             d(lc="objective_to_minimize"),
-            UserResult(objective_to_minimize=1.0, learning_curve=[1.0]),
+            UserResult(objective_to_minimize=1.0, cost=2.0, learning_curve=[1.0]),
         ),
         # Multiobjective
         (
-            {"objective_to_minimize": [1.0, 2.0]},
+            {"objective_to_minimize": [1.0, 2.0], "cost": 2.0},
             d(),
-            UserResult(objective_to_minimize=[1.0, 2.0]),
+            UserResult(objective_to_minimize=[1.0, 2.0], cost=2.0),
         ),
         (
             {"objective_to_minimize": [1.0, 2.0]},
@@ -116,10 +86,11 @@ EXCEPTION = Exception("")
             ),
         ),
         (
-            {"objective_to_minimize": [1.0, 2.0]},
+            {"objective_to_minimize": [1.0, 2.0], "cost": 2.0},
             d(lc="objective_to_minimize"),
             UserResult(
                 objective_to_minimize=[1.0, 2.0],
+                cost=2.0,
                 learning_curve=[[1.0, 2.0]],
             ),
         ),
@@ -162,14 +133,14 @@ EXCEPTION = Exception("")
         (
             {
                 "objective_to_minimize": [1.0, 2.0],
-                "cost": None,
+                "cost": 2.0,
                 "learning_curve": None,
                 "exception": None,
             },
             d(lc="objective_to_minimize"),
             UserResult(
                 objective_to_minimize=[1.0, 2.0],
-                cost=None,
+                cost=2.0,
                 learning_curve=[[1.0, 2.0]],
                 exception=None,
             ),
@@ -177,21 +148,28 @@ EXCEPTION = Exception("")
         (
             {
                 "objective_to_minimize": 1.0,
+                "cost": 2.0,
                 "info_dict": {"a": "b"},
             },
             d(),
-            UserResult(objective_to_minimize=1.0, extra={"a": "b"}),
+            UserResult(objective_to_minimize=1.0, cost=2.0, extra={"a": "b"}),
         ),
         (
             {
                 "objective_to_minimize": 1.0,
+                "cost": 2.0,
                 "inference_cost": 2,
+                "n_params": np.int64(1000),
+                "n_data": 5e6,
                 "downstream_performances": {"task_acc": np.float32(0.5)},
             },
             d(),
             UserResult(
                 objective_to_minimize=1.0,
+                cost=2.0,
                 inference_cost=2.0,
+                n_params=1000.0,
+                n_data=5e6,
                 downstream_performances={"task_acc": 0.5},
             ),
         ),
@@ -210,29 +188,35 @@ def test_user_result_parse_success(
 @pytest.mark.parametrize(
     ("inp", "defaults"),
     [
-        # Bad values
+        # Not a dictionary or an exception
         (object(), d()),
+        (1.0, d()),
+        (np.float64(4.5), d(cost=2.0)),
+        ([1.0, 2.0], d(cost=2.0)),
+        ("1.0", d()),
+        # No cost, though successful
+        ({"objective_to_minimize": 1.0}, d()),
+        ({"objective_to_minimize": 1.0, "cost": None}, d()),
+        # Bad values
         ({"objective_to_minimize": object()}, d()),
         ({"objective_to_minimize": 1.0, "cost": object()}, d()),
         ({"objective_to_minimize": 1.0, "learning_curve": object()}, d()),
         ({"objective_to_minimize": 1.0, "info_dict": object()}, d()),
         ({"objective_to_minimize": 1.0, "exception": object()}, d()),
-        ({"objective_to_minimize": 1.0, "inference_cost": "2"}, d()),
+        ({"objective_to_minimize": 1.0, "cost": 2.0, "inference_cost": "2"}, d()),
+        ({"objective_to_minimize": 1.0, "cost": 2.0, "n_params": "1e3"}, d()),
+        ({"objective_to_minimize": 1.0, "cost": 2.0, "n_data": [5]}, d()),
         ({"objective_to_minimize": 1.0, "downstream_performances": [0.5]}, d()),
         ({"objective_to_minimize": 1.0, "downstream_performances": {"a": "b"}}, d()),
         # Bad defaults (obj)
         (EXCEPTION, d(obj=object())),
         ({"exception": EXCEPTION}, d(obj=object())),
         # Bad defaults (cost)
-        (1.0, d(cost=object())),
-        ([1.0, 2.0], d(cost=object())),
         (EXCEPTION, d(cost=object())),
         ({"objective_to_minimize": 1.0}, d(cost=object())),
         # Bad defaults (lc)
-        (1.0, d(lc=object())),
-        ([1.0, 2.0], d(lc=object())),
         (EXCEPTION, d(lc=object())),
-        ({"objective_to_minimize": 1.0}, d(lc=object())),
+        ({"objective_to_minimize": 1.0, "cost": 2.0}, d(lc=object())),
         # No objective_to_minimize or no exception
         ({"cost": 2.0}, d()),
         # Catch legacy

@@ -116,7 +116,10 @@ def test_bayesian_optimization_without_cost_estimator(tmp_path: Path) -> None:
         y = extrapolaw.Float(0.0, 1.0)
 
     extrapolaw.acquire(
-        evaluate_pipeline=lambda x, y: (x - 0.3) ** 2 + y,
+        evaluate_pipeline=lambda x, y: {
+            "objective_to_minimize": (x - 0.3) ** 2 + y,
+            "cost": 1.0,
+        },
         pipeline_space=FloatSpace(),
         root_directory=tmp_path / "run",
         optimizer=("bayesian_optimization", {"initial_design_size": 3}),

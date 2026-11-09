@@ -15,6 +15,7 @@ def evaluate_pipeline(float1, float2, categorical, integer1, integer2):
     end = time.time()
     return {
         "objective_to_minimize": objective_to_minimize,
+        "cost": 1.0,  # The training cost of this run, e.g. its FLOPs
         "info_dict": {  # Optionally include additional information as an info_dict
             "train_time": end - start,
         },

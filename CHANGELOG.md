@@ -12,9 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `carbs` optimizer, wrapping [CARBS](https://github.com/imbue-ai/carbs).
 - `chinchilla` optimizer for [Chinchilla](https://arxiv.org/abs/2203.15556) guided scaling studies.
 - Added scaling plots also with the inference cost in with CSV outputs and TensorBoard logging. `evaluate_pipeline` can return an `inference_cost` and `downstream_performances` next to the `cost`.
+- `evaluate_pipeline` can return the model size `n_params` and the amount of training data `n_data`, which `extrapolaw.predict()` uses.
 
 ### Changed
 - **BREAKING:** Renamed `extrapolaw.run()` to `extrapolaw.acquire()`.
+- **BREAKING:** `evaluate_pipeline` must return a dictionary with `objective_to_minimize` and the training `cost`, unless a `cost_estimator` provides the cost.
 - **BREAKING:** Forked from NePS 0.17.0 and renamed the package `neps` → `extrapolaw` (PyPI package, import name, CLI, `EXTRAPOLAW_*` env vars, optimizer names, default result dirs, examples in `extrapolaw_examples/`).
 - `bayesian_optimization` passes the space's constants to `constraints_func`, like `random_search` does.
 

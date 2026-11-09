@@ -23,9 +23,9 @@ class SimpleSpace(PipelineSpace):
     y = Integer(lower=1, upper=10)
 
 
-def simple_evaluation(x: float, y: int) -> float:
+def simple_evaluation(x: float, y: int) -> dict:
     """Simple evaluation function."""
-    return x + y
+    return {"objective_to_minimize": x + y, "cost": 1.0}
 
 
 def test_basic_extrapolaw_acquire():
@@ -57,6 +57,7 @@ def test_extrapolaw_optimization_with_dict_return():
     def dict_evaluation(x: float, y: int) -> dict:
         return {
             "objective_to_minimize": x + y,
+            "cost": 1.0,
             "additional_metric": x * y,
         }
 
@@ -129,10 +130,10 @@ def test_evaluation_results_are_recorded():
     # Track evaluations
     evaluations_called = []
 
-    def tracking_evaluation(x: float, y: int) -> float:
+    def tracking_evaluation(x: float, y: int) -> dict:
         result = x + y
         evaluations_called.append((x, y, result))
-        return result
+        return {"objective_to_minimize": result, "cost": 1.0}
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         root_directory = Path(tmp_dir) / "tracking_test"

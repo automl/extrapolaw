@@ -91,13 +91,18 @@ def test_async_happy_path_changes_state(extrapolaw_state: ExtrapolawState) -> No
     trial_after = next(trial_iter)
     assert trial_after.metadata.state == Trial.State.EVALUATING
 
-    result_dict = {"objective_to_minimize": 10}  # cost not provided
-    callback_holder[1](result_dict)
+    # Without a cost, the result is refused and the trial is still being evaluated
+    with pytest.raises(ValueError, match="no 'cost'"):
+        callback_holder[1]({"objective_to_minimize": 10})
+    trial_after = list(extrapolaw_state.lock_and_read_trials().values())[1]
+    assert trial_after.metadata.state == Trial.State.EVALUATING
+
+    callback_holder[1]({"objective_to_minimize": 10, "cost": 2.0})
     trials = extrapolaw_state.lock_and_read_trials()
     trial_after = list(trials.values())[1]
     assert trial_after.metadata.state == Trial.State.SUCCESS
     assert trial_after.report.objective_to_minimize == 10
-    assert trial_after.report.cost is None  # default is always None
+    assert trial_after.report.cost == 2.0
 
 
 def test_async_save_updates_the_whole_summary(extrapolaw_state: ExtrapolawState) -> None:
@@ -164,7 +169,7 @@ def test_analyze_rebuilds_the_summary(extrapolaw_state: ExtrapolawState) -> None
     DefaultWorker.new(
         state=extrapolaw_state,
         optimizer=random_search(ASpace()),
-        evaluation_fn=lambda *_, **__: 0.5,
+        evaluation_fn=lambda *_, **__: {"objective_to_minimize": 0.5, "cost": 1.0},
         settings=settings,
     ).run()
 

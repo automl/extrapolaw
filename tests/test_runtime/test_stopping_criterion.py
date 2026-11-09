@@ -58,7 +58,7 @@ def test_evaluations_to_spend_stopping_criterion(
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
+    def eval_function(*args, **kwargs) -> dict:
         return {"objective_to_minimize": 1.0, "cost": 3.0}
 
     worker = DefaultWorker.new(
@@ -289,8 +289,8 @@ def test_total_fidelities_to_spend_stopping_criterion(
         total_fidelities_to_spend=11,
     )
 
-    def eval_function(*args, **kwargs) -> float:
-        return 1.0
+    def eval_function(*args, **kwargs) -> dict:
+        return {"objective_to_minimize": 1.0, "cost": 1.0}
 
     def total_fidelity_spent() -> float:
         return sum(
@@ -371,8 +371,8 @@ def test_global_budget_can_be_updated(extrapolaw_state: ExtrapolawState) -> None
     assert optimizer_state.budget.total_evaluations_to_spend == 10
 
 
-def eval_function(*_args, **_kwargs) -> float:
-    return 1.0
+def eval_function(*_args, **_kwargs) -> dict:
+    return {"objective_to_minimize": 1.0, "cost": 1.0}
 
 
 def test_worker_uses_updated_global_budget(
@@ -519,8 +519,8 @@ def test_include_in_progress_evaluations_towards_maximum_with_work_eval_count(
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
-        return 1.0
+    def eval_function(*args, **kwargs) -> dict:
+        return {"objective_to_minimize": 1.0, "cost": 1.0}
 
     worker = DefaultWorker.new(
         worker_id="test",
@@ -585,8 +585,8 @@ def test_worker_wallclock_time(extrapolaw_state: ExtrapolawState) -> None:
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
-        return 1.0
+    def eval_function(*args, **kwargs) -> dict:
+        return {"objective_to_minimize": 1.0, "cost": 1.0}
 
     worker = DefaultWorker.new(
         state=extrapolaw_state,
@@ -626,9 +626,9 @@ def test_max_worker_evaluation_time(extrapolaw_state: ExtrapolawState) -> None:
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
+    def eval_function(*args, **kwargs) -> dict:
         time.sleep(0.6)
-        return 1.0
+        return {"objective_to_minimize": 1.0, "cost": 1.0}
 
     worker = DefaultWorker.new(
         state=extrapolaw_state,
@@ -682,9 +682,9 @@ def test_fidelity_to_spend(extrapolaw_state: ExtrapolawState) -> None:
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
+    def eval_function(*args, **kwargs) -> dict:
         time.sleep(0.6)
-        return 1.0
+        return {"objective_to_minimize": 1.0, "cost": 1.0}
 
     worker = DefaultWorker.new(
         state=extrapolaw_state,
@@ -774,8 +774,8 @@ def test_budget_exhausted_optimizer_stops_the_worker_without_retrying(
         batch_size=None,
     )
 
-    def eval_function(*args, **kwargs) -> float:
-        return 1.0
+    def eval_function(*args, **kwargs) -> dict:
+        return {"objective_to_minimize": 1.0, "cost": 1.0}
 
     worker = DefaultWorker.new(
         state=extrapolaw_state,

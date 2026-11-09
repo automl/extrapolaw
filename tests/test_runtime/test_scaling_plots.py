@@ -38,8 +38,8 @@ def _scaling(width: int, lr: float) -> dict:
     }
 
 
-def _no_cost(width: int, lr: float) -> dict:
-    return {"objective_to_minimize": lr}
+def _zero_cost(width: int, lr: float) -> dict:
+    return {"objective_to_minimize": lr, "cost": 0.0}
 
 
 def _run(root: Path, evaluate_pipeline: object) -> None:
@@ -176,9 +176,9 @@ def test_tensorboard_is_fail_safe(
     assert sorted(_frontiers(log_dir)) == list(range(1, 13))
 
 
-def test_no_scaling_plots_without_cost(tmp_path: Path) -> None:
+def test_no_scaling_plots_without_a_positive_cost(tmp_path: Path) -> None:
     root = tmp_path / "results"
-    _run(root, _no_cost)
+    _run(root, _zero_cost)
     extrapolaw.analyze(root)
 
     assert (root / "summary" / "incumbent_trajectory.png").exists()
