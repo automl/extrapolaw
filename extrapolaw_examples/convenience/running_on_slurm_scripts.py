@@ -56,8 +56,10 @@ echo -10 > {pipeline_directory}/validation_error_from_slurm_job.txt
     while validation_error := _get_validation_error(pipeline_directory) is None:
         logging.info("Waiting until the job has finished.")
         time.sleep(60)  # Adjust to something reasonable
-    return validation_error
-
+    return {
+        "objective_to_minimize": validation_error,
+        "cost": 1.0,  # The training cost of this run, e.g. its FLOPs
+    }
 
 class HPOSpace(extrapolaw.PipelineSpace):
     optimizer = extrapolaw.Categorical(choices=("sgd", "adam"))

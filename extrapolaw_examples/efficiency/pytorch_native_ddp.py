@@ -111,7 +111,10 @@ def evaluate_pipeline(learning_rate, epochs):
     )
 
     loss = sum(loss_dict.values()) // world_size
-    return {"loss": loss}
+    return {
+        "objective_to_minimize": loss,
+        "cost": float(epochs),  
+    }
 
 
 class HPOSpace(extrapolaw.PipelineSpace):

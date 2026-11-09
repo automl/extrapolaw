@@ -219,7 +219,7 @@ class ConditionalPipelineSpace(extrapolaw.PipelineSpace):
     )
 
 
-def evaluate_conditional_pipeline(pipeline: dict) -> float:
+def evaluate_conditional_pipeline(pipeline: dict) -> dict:
     """Evaluate the fully constructed pipeline."""
 
     loss = 0.5
@@ -233,8 +233,7 @@ def evaluate_conditional_pipeline(pipeline: dict) -> float:
             loss -= 0.005 if block["kernel_size"] == 3 else 0
 
     loss -= 0.02 if pipeline["optimizer"] == "adamw" else 0
-    return max(0.1, loss)
-
+    return {"objective_to_minimize": max(0.1, loss), "cost": 1.0}
 
 conditional_space = ConditionalPipelineSpace()
 extrapolaw.acquire(
