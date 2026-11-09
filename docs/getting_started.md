@@ -30,12 +30,12 @@ pip install extrapolaw
 
     ```python
     def evaluate_pipeline(some_parameter: float,
-                     another_parameter: float,
-                     optimizer: str, epoch: int,
-                     learning_rate: float, alpha: float) -> float:
+                    another_parameter: float,
+                    optimizer: str, epoch: int,
+                    learning_rate: float, alpha: float) -> dict:
         model = make_model(...)
         loss = eval_model(model)
-        return loss
+        return {"objective_to_minimize": loss, "cost": training_flops(model)}
     ```
 
 1. **Execute with [`extrapolaw.acquire()`](reference/extrapolaw_acquire.md)**:

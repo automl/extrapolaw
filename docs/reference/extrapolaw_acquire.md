@@ -15,9 +15,9 @@ To operate, Extrapolaw requires at minimum the following two arguments
 ```python
 import extrapolaw
 
-def evaluate_pipeline(learning_rate: float, epochs: int) -> float:
+def evaluate_pipeline(learning_rate: float, epochs: int) -> dict:
     # Your code here
-    return loss
+    return {"objective_to_minimize": loss, "cost": training_flops}
 
 class ExamplePipeline(extrapolaw.PipelineSpace):
     learning_rate = extrapolaw.Float(1e-3, 1e-1, log=True)
@@ -54,13 +54,13 @@ Each of these also has a `worker_` variant (e.g. `worker_evaluations_to_spend=`)
 
 
 ```python
-def evaluate_pipeline(learning_rate: float, epochs: int) -> float:
+def evaluate_pipeline(learning_rate: float, epochs: int) -> dict:
     start = time.time()
 
     # Your code here
     end = time.time()
     duration = end - start
-    return {"objective_function_to_minimize": loss, "cost": duration}
+    return {"objective_to_minimize": loss, "cost": duration}
 
 extrapolaw.acquire(
     total_evaluations_to_spend=10, # (1)!
@@ -162,7 +162,7 @@ To continue a run, all you need to do is provide the same `root_directory=` to [
 and specify a new stopping criterria(e.g. through `total_evaluations_to_spend=` and/or `total_cost_to_spend=`).
 
 ```python
-def run(learning_rate: float, epochs: int) -> float:
+def run(learning_rate: float, epochs: int) -> dict:
     start = time.time()
 
     # Your code here
@@ -323,12 +323,12 @@ Things go wrong during optimization runs and it's important to consider what to 
 By default, Extrapolaw will halt the optimization process when an error but you can choose to `ignore_errors=`.
 
 ```python
-def run(learning_rate: float, epochs: int) -> float:
+def run(learning_rate: float, epochs: int) -> dict:
     if whoops_my_gpu_died():
         raise RuntimeError("Oh no! GPU died!")
 
     ...
-    return loss
+    return {"objective_to_minimize": loss, "cost": training_flops}
 
 extrapolaw.acquire(
     ignore_errors=True, # (1)!

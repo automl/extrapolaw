@@ -75,6 +75,8 @@ figure comes with a CSV of the exact points it shows, so you can re-plot them yo
 | 2          | `pareto_front.png`, `pareto_front.csv`                 | [Pareto front](#pareto-front)                 |
 | 3 or more  | none                                                   | `best_config.txt` still lists the Pareto set  |
 
+Single-objective runs that report a `cost` also get [scaling plots](#scaling-plots).
+
 #### Incumbent trajectory
 
 Every evaluated objective (grey) and the best one found so far (blue), against the
@@ -90,6 +92,26 @@ Both objectives of every trial against each other (grey), with the non-dominated
 joined up (red).
 
 ![Pareto front](../doc_images/analyse/pareto_front.png)
+
+
+#### Scaling plots
+
+If the runs return a positive `cost`, Extrapolaw also draws scaling plots in
+`summary/scaling/`, each with a CSV of its points. All of them use log-log axes and
+mark the Pareto frontier: the runs with the best result for their cost.
+
+| Files in `summary/scaling/`        | Plot                                                                                                      |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `loss_over_cost.{png,csv}`         | the loss of every run over its training cost, the frontier and a power law fitted through it             |
+| `downstream/<name>_over_cost.{png,csv}` | the same for each metric in `downstream_performances`, with a frontier of its own                        |
+| `parameters/<name>_over_cost.{png,csv}` | each number in the config or `info_dict` that varies, coloured by the loss, with the frontier runs circled |
+| `pareto_optimal_points.json`       | the runs on the frontier of loss over cost, with their configs                                           |
+
+If the runs also return an `inference_cost`, every plot is drawn over it too
+(`..._over_inference_cost`), with frontiers of their own, since a model that is
+cheap to train can still be expensive to use. Accuracy-like metrics (names
+containing `_acc` or `recall`) are plotted as `1 - value`. See
+[the evaluate function](evaluate_pipeline.md) for the values to return.
 
 
 ## Live plots during a run
@@ -123,7 +145,9 @@ ROOT_DIRECTORY
 │   ├── best_config.txt                 # The incumbent, or the Pareto set
 │   ├── best_config_trajectory.txt      # Every config that became the incumbent
 │   ├── incumbent_trajectory.{png,csv}  # 1 objective, with plots on
-│   └── pareto_front.{png,csv}          # 2 objectives, with plots on
+│   ├── pareto_front.{png,csv}          # 2 objectives, with plots on
+│   └── scaling/                        # Scaling plots, if the runs report a cost
+├── summary_tb/                         # Scaling data for TensorBoard
 ├── optimizer_info.yaml                 # The optimizer's configuration
 ├── optimizer_state.pkl                 # The optimizer's state, shared between workers
 └── pipeline_space.pkl                  # The search space
@@ -135,6 +159,27 @@ ROOT_DIRECTORY
 
 
 # TensorBoard integration
+
+
+### Scaling data
+
+For runs that report a `cost`, Extrapolaw logs to `ROOT_DIRECTORY/summary_tb` after
+every evaluation, with or without `live_plots`, one step per run:
+
+- `scaling/incumbent/loss`: the best loss so far;
+- `scaling/frontier/<metric>_over_<cost>`: the runs on each Pareto frontier so far, as
+  `(trial id, value, cost)`, for the loss and each downstream metric, over the cost
+  and the inference cost.
+
+The trial ids match `summary/full.csv`. Logging to TensorBoard never stops a run: if
+it fails, it only warns and catches up at the next update. TensorBoard shows only 10
+text entries per tag by default, so to see the frontier at every step, start it with
+
+```bash
+tensorboard --logdir ROOT_DIRECTORY/summary_tb --samples_per_plugin text=0
+```
+
+### Logging your own metrics
 
 In Extrapolaw we replaced the traditional TensorBoard `SummaryWriter` with the `ConfigWriter` to streamline the logging process. This integration enhances the ability to visualize and diagnose hyperparameter optimization workflows, providing detailed insights into metrics and configurations during training.
 
