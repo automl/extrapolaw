@@ -183,3 +183,18 @@ def test_no_scaling_plots_without_a_positive_cost(tmp_path: Path) -> None:
 
     assert (root / "summary" / "incumbent_trajectory.png").exists()
     assert not (root / "summary" / "scaling").exists()
+
+
+def test_predict_saves_the_prediction_plot(tmp_path: Path) -> None:
+    root = tmp_path / "results"
+    _run(root, _scaling)
+
+    state = ExtrapolawState.create_or_load(path=root, load_only=True)
+    assert state.lock_and_get_optimizer_info()["derived"]["predictor"] == "power_law"
+
+    extrapolaw.predict(root, [1e14, 1e15])
+    scaling = root / "summary" / "scaling"
+    assert (scaling / "prediction.png").exists()
+    predictions = pd.read_csv(scaling / "prediction.csv")
+    assert list(predictions["target_flops"]) == [1e14, 1e15]
+    assert len(pd.read_csv(scaling / "prediction_history.csv")) > 0

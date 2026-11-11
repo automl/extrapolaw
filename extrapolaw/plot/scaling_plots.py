@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import portalocker as pl
 from matplotlib.figure import Figure
+from matplotlib.ticker import FuncFormatter
 
 from extrapolaw.optimizers.optimizer import Artifact, ArtifactType
 from extrapolaw.state.filebased import FileLocker
@@ -19,12 +20,21 @@ from extrapolaw.utils.power_law import fit_power_law
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from matplotlib.axes import Axes
+
     from extrapolaw.state.trial import Trial
 
 logger = logging.getLogger(__name__)
 
 PARETO_COLOR = "#D55E00"
 DOMINATED_COLOR = "#B0B0B0"
+INK = "#2B2B2B"
+SECONDARY_INK = "#52514E"
+AXIS_COLOR = "#C3C2B7"
+GRID_COLOR = "#E6E5DF"
+EXTRAPOLATION_COLOR = "#F3F2EE"
+TARGET_COLORS = ["#86B6EF", "#6DA7EC", "#5598E7", "#3987E5", "#2A78D6", "#256ABF"]
+"""Blues from light to dark, one per target budget of the prediction plot."""
 COLUMNS = ["trial_id", "cost", "loss", "on_frontier"]
 TENSORBOARD_LOCK_TIMEOUT = 5.0
 """Seconds to wait for another worker logging to TensorBoard, before trying again at
@@ -89,7 +99,10 @@ def runs_table(trials: Sequence[Trial]) -> pd.DataFrame:
 
 
 def plot_loss_over_cost(
-    table: pd.DataFrame, loss: str = "loss", cost: str = "cost"
+    table: pd.DataFrame,
+    loss: str = "loss",
+    cost: str = "cost",
+    fit_line: tuple[Sequence[float], Sequence[float], str] | None = None,
 ) -> list[Artifact]:
     """Every run's loss over its cost, the Pareto frontier and a power law through it.
 
@@ -99,6 +112,8 @@ def plot_loss_over_cost(
             frontier of its own.
         cost: The cost to plot over: "cost", or "inference_cost", which then gets
             a frontier of its own.
+        fit_line: The x and y values and the label of a fitted line to draw instead
+            of the power law, e.g. from `fitted_losses`.
     """
     table = _with_frontier(table, cost, loss)
     front = table[table["on_frontier"]].sort_values("cost")
@@ -120,7 +135,10 @@ def plot_loss_over_cost(
         label="Dominated runs",
     )
     fit = fit_power_law(front[cost].to_numpy(), front[loss].to_numpy())
-    if fit is not None:
+    if fit_line is not None:
+        xs, ys, fit_label = fit_line
+        ax.plot(xs, ys, color="black", linewidth=2, label=fit_label)
+    elif fit is not None:
         ax.plot(
             front[cost],
             10**fit.intercept * front[cost] ** fit.slope,
@@ -224,9 +242,57 @@ def pareto_optimal_points(table: pd.DataFrame, trials: Sequence[Trial]) -> Artif
     return Artifact("scaling/pareto_optimal_points", points, ArtifactType.JSON)
 
 
-def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
+def fitted_losses(
+    trials: Sequence[Trial],
+    predictor: str,
+    flops: Sequence[float],
+    data_parameter_name: str | None = None,
+    params_estimator: Callable[..., float] | None = None,
+) -> list[float] | None:
+    """The best loss the scaling law `predictor` predicts at each of `flops`, fitted on
+    `trials`, or None if it cannot be fitted on them.
+    """
+    from extrapolaw.prediction import (
+        Target,
+        fit_and_predict,
+        get_predictor_type,
+        rows_from_trials,
+    )
+
+    rows, _curves, configs = rows_from_trials(
+        trials,
+        params_estimator=params_estimator,
+        data_parameter_name=data_parameter_name,
+    )
+    try:
+        predictions = fit_and_predict(
+            get_predictor_type(predictor),
+            [float(f) for f in flops],
+            targets=[Target.LOSS],
+            rows=rows,
+            configs=configs,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"Could not fit '{predictor}' on the runs: {e}")
+        return None
+
+    losses = [p.loss for p in predictions]
+    for loss in losses:
+        if loss is None or not np.isfinite(loss):
+            return None
+    return [float(loss) for loss in losses]  # type: ignore[arg-type]
+
+
+def plot_scaling(
+    trials: Sequence[Trial],
+    predictor: str = "power_law",
+    data_parameter_name: str | None = None,
+) -> list[Artifact]:
     """All scaling plots, over the cost and, if reported, the inference cost, if any
     successful run reports a cost.
+
+    The loss over the cost is fitted with `predictor`, the scaling law of the run's
+    optimizer, falling back to a plain power law if it cannot be fitted.
     """
     table = runs_table(trials)
     if table.empty:
@@ -245,14 +311,208 @@ def plot_scaling(trials: Sequence[Trial]) -> list[Artifact]:
             continue
         parameters.append(parameter)
 
+    xs = np.geomspace(table["cost"].min(), table["cost"].max(), 50)
+    ys = fitted_losses(trials, predictor, xs, data_parameter_name)
+    fit_line = None
+    if ys is not None:
+        fit_line = (list(xs), ys, f"{predictor} fit")
+
     artifacts = [pareto_optimal_points(table, trials)]
     for cost in costs:
-        artifacts += plot_loss_over_cost(table, cost=cost)
+        if cost == "cost":
+            artifacts += plot_loss_over_cost(table, cost=cost, fit_line=fit_line)
+        else:
+            artifacts += plot_loss_over_cost(table, cost=cost)
         for metric in downstream:
             artifacts += plot_loss_over_cost(table, metric, cost)
         for parameter in parameters:
             artifacts += plot_parameter_over_cost(table, parameter, cost)
     return artifacts
+
+
+def _power_of_ten(value: float) -> str:
+    """`value` as `10^13` or `3x10^13`, in matplotlib's math text."""
+    exponent = int(np.floor(np.log10(value)))
+    mantissa = round(value / 10**exponent, 1)
+    if mantissa == 1:
+        return f"$10^{{{exponent}}}$"
+    return f"${mantissa:g}\\times10^{{{exponent}}}$"
+
+
+def _plain_log_labels(ax: Axes) -> None:
+    """Label the log y axis with plain numbers, e.g. 2, 5, 10, instead of 2x10^0."""
+    low, high = ax.get_ylim()
+    shown = list(range(1, 10))
+    if high / low > 10:
+        shown = [1, 2, 5]
+    elif high / low > 3:
+        shown = [1, 2, 3, 5]
+
+    def label(value: float, _position: int) -> str:
+        mantissa = round(value / 10 ** np.floor(np.log10(value)))
+        return f"{value:g}" if mantissa in shown else ""
+
+    ax.yaxis.set_major_formatter(FuncFormatter(label))
+    ax.yaxis.set_minor_formatter(FuncFormatter(label))
+
+
+def _style(ax: Axes, title: str, xlabel: str, ylabel: str) -> None:
+    """Light axes and grid, so the data stands out."""
+    ax.set_title(title, loc="left", color=INK, fontsize=12, pad=10)
+    ax.set_xlabel(xlabel, color=SECONDARY_INK)
+    ax.set_ylabel(ylabel, color=SECONDARY_INK)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["left", "bottom"]].set_color(AXIS_COLOR)
+    ax.tick_params(which="both", color=AXIS_COLOR, labelcolor=SECONDARY_INK)
+    ax.grid(visible=True, which="major", color=GRID_COLOR, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.legend(loc="best", frameon=False, fontsize=9, labelcolor=SECONDARY_INK)
+
+
+def _target_colors(n_targets: int) -> list[str]:
+    """A blue per target budget, darker for larger budgets."""
+    if n_targets == 1:
+        return [TARGET_COLORS[-2]]
+    steps = np.linspace(0, len(TARGET_COLORS) - 1, n_targets).round()
+    return [TARGET_COLORS[int(step)] for step in steps]
+
+
+def _prediction_history(
+    finished: Sequence[Trial],
+    predictor: str,
+    target_flops: Sequence[float],
+    data_parameter_name: str | None = None,
+    params_estimator: Callable[..., float] | None = None,
+) -> pd.DataFrame:
+    """The prediction at `target_flops` after each finished run, at most 20 refits."""
+    history = []
+    for n in sorted({int(n) for n in np.linspace(3, len(finished), 20)}):
+        losses = fitted_losses(
+            finished[:n], predictor, target_flops, data_parameter_name, params_estimator
+        )
+        if losses is None:
+            continue
+        spent = runs_table(finished[:n])["cost"].sum()
+        for flops, loss in zip(target_flops, losses, strict=True):
+            history.append(
+                {"n_runs": n, "cost_spent": spent, "target_flops": flops, "loss": loss}
+            )
+    return pd.DataFrame(history)
+
+
+def plot_prediction(
+    trials: Sequence[Trial],
+    predictor: str,
+    target_flops: Sequence[float],
+    data_parameter_name: str | None = None,
+    params_estimator: Callable[..., float] | None = None,
+) -> list[Artifact]:
+    """The prediction of `predictor` at `target_flops`, in two panels.
+
+    Left: the runs, their Pareto frontier and the fit, extended (dashed) to the target
+    budgets with the predicted losses. Right: the predicted loss at each target
+    budget, refitted after each finished run, to see whether it has settled.
+    """
+    finished = sorted(trials, key=lambda t: t.metadata.time_end or float("inf"))
+    table = runs_table(finished)
+    if table.empty:
+        return []
+    predicted = fitted_losses(
+        finished, predictor, target_flops, data_parameter_name, params_estimator
+    )
+    if predicted is None:
+        return []
+    table = _with_frontier(table, "cost", "loss")
+    front = table[table["on_frontier"]]
+    largest_run = table["cost"].max()
+    colors = _target_colors(len(target_flops))
+
+    fig = Figure(figsize=(12, 4.6))
+    ax = fig.add_subplot(1, 2, 1)
+    ax.scatter(
+        table["cost"],
+        table["loss"],
+        s=16,
+        color=DOMINATED_COLOR,
+        linewidths=0,
+        label="Runs",
+    )
+    ax.scatter(
+        front["cost"],
+        front["loss"],
+        s=44,
+        color=PARETO_COLOR,
+        edgecolors="white",
+        linewidths=1,
+        zorder=3,
+        label="Pareto frontier",
+    )
+    xs = np.geomspace(table["cost"].min(), max(target_flops), 60)
+    ys = fitted_losses(finished, predictor, xs, data_parameter_name, params_estimator)
+    if ys is not None:
+        fit = np.asarray(ys)
+        inside = xs <= largest_run
+        last = inside.sum() - 1
+        ax.plot(xs[inside], fit[inside], color=INK, linewidth=2, label=f"{predictor} fit")
+        ax.plot(xs[last:], fit[last:], color=INK, linewidth=2, linestyle=(0, (4, 3)))
+    ax.scatter(
+        target_flops,
+        predicted,
+        s=90,
+        c=colors,
+        edgecolors="white",
+        linewidths=1.5,
+        zorder=4,
+        label="Prediction",
+    )
+    for flops, loss in zip(target_flops, predicted, strict=True):
+        ax.annotate(
+            f"{loss:.3g}",
+            (flops, loss),
+            textcoords="offset points",
+            xytext=(8, 6),
+            color=INK,
+            fontweight="bold",
+        )
+    ax.set(xscale="log", yscale="log")
+    xmin, xmax = ax.get_xlim()
+    ax.axvspan(
+        largest_run, xmax, color=EXTRAPOLATION_COLOR, zorder=0, label="Beyond the runs"
+    )
+    ax.set_xlim(xmin, xmax)
+    _plain_log_labels(ax)
+    _style(ax, f"Predicted loss with {predictor}", "Training cost", "Loss")
+
+    history = _prediction_history(
+        finished, predictor, target_flops, data_parameter_name, params_estimator
+    )
+    ax = fig.add_subplot(1, 2, 2)
+    for flops, color in zip(target_flops, colors, strict=True):
+        if history.empty:
+            break
+        rows = history[history["target_flops"] == flops]
+        ax.plot(
+            rows["cost_spent"],
+            rows["loss"],
+            color=color,
+            linewidth=2,
+            drawstyle="steps-post",
+            marker="o",
+            markersize=6,
+            markeredgecolor="white",
+            label=f"At {_power_of_ten(flops)}",
+        )
+    ax.set(xscale="log", yscale="log")
+    _plain_log_labels(ax)
+    _style(ax, "How the prediction settled", "Cost spent so far", "Predicted loss")
+    fig.tight_layout(w_pad=3)
+
+    predictions = pd.DataFrame({"target_flops": target_flops, "loss": predicted})
+    return [
+        Artifact("scaling/prediction", fig, ArtifactType.FIGURE),
+        Artifact("scaling/prediction", predictions, ArtifactType.CSV),
+        Artifact("scaling/prediction_history", history, ArtifactType.CSV),
+    ]
 
 
 def log_to_tensorboard(trials: Sequence[Trial], log_dir: Path) -> None:
