@@ -477,7 +477,11 @@ def plot_prediction(
     ax.set(xscale="log", yscale="log")
     xmin, xmax = ax.get_xlim()
     ax.axvspan(
-        largest_run, xmax, color=EXTRAPOLATION_COLOR, zorder=0, label="Beyond the runs"
+        largest_run,
+        xmax,
+        color=EXTRAPOLATION_COLOR,
+        zorder=0,
+        label="Extrapolation region",
     )
     ax.set_xlim(xmin, xmax)
     _plain_log_labels(ax)
@@ -500,11 +504,11 @@ def plot_prediction(
             marker="o",
             markersize=6,
             markeredgecolor="white",
-            label=f"At {_power_of_ten(flops)}",
+            label=f"Target {_power_of_ten(flops)}",
         )
     ax.set(xscale="log", yscale="log")
     _plain_log_labels(ax)
-    _style(ax, "How the prediction settled", "Cost spent so far", "Predicted loss")
+    _style(ax, "Prediction convergence", "Cumulative training cost", "Predicted loss")
     fig.tight_layout(w_pad=3)
 
     predictions = pd.DataFrame({"target_flops": target_flops, "loss": predicted})
