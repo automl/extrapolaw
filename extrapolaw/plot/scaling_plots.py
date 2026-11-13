@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import tempfile
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -18,8 +21,6 @@ from extrapolaw.utils.pareto import pareto_efficient
 from extrapolaw.utils.power_law import fit_power_law
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from matplotlib.axes import Axes
 
     from extrapolaw.state.trial import Trial
@@ -569,20 +570,23 @@ def _log_new_runs(table: pd.DataFrame, log_dir: Path) -> None:
 
     from torch.utils.tensorboard.writer import SummaryWriter
 
-    writer = SummaryWriter(log_dir=str(log_dir))
-    downstream = [c for c in table.columns if c.startswith("downstream/")]
-    new = table[is_new]
-    for i, trial_id in enumerate(new["trial_id"]):
-        logged.append(trial_id)
-        step = len(logged)
-        seen = pd.concat([table[~is_new], new.iloc[: i + 1]])
-        writer.add_scalar("scaling/incumbent/loss", seen["loss"].min(), step)
-        # Every step gets its frontiers, also when it is logged late
-        for cost in _costs(table):
-            for loss in ["loss", *downstream]:
-                tag = f"scaling/frontier/{loss}_over_{cost}"
-                writer.add_text(tag, _frontier_text(seen, cost, loss), step)
-    writer.close()
+    first_step = len(logged) + 1
+    with tempfile.TemporaryDirectory() as staging:
+        writer = SummaryWriter(log_dir=staging)
+        downstream = [c for c in table.columns if c.startswith("downstream/")]
+        new = table[is_new]
+        for i, trial_id in enumerate(new["trial_id"]):
+            logged.append(trial_id)
+            step = len(logged)
+            seen = pd.concat([table[~is_new], new.iloc[: i + 1]])
+            writer.add_scalar("scaling/incumbent/loss", seen["loss"].min(), step)
+            for cost in _costs(table):
+                for loss in ["loss", *downstream]:
+                    tag = f"scaling/frontier/{loss}_over_{cost}"
+                    writer.add_text(tag, _frontier_text(seen, cost, loss), step)
+        writer.close()
+        [event_file] = Path(staging).iterdir()
+        shutil.move(event_file, log_dir / f"events.out.tfevents.{first_step:010d}")
     logged_file.write_text("\n".join(logged))
 
 

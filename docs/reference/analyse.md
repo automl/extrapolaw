@@ -184,7 +184,7 @@ it fails, it only warns and catches up at the next update. TensorBoard shows onl
 text entries per tag by default, so to see the frontier at every step, start it with
 
 ```bash
-tensorboard --logdir ROOT_DIRECTORY/summary_tb --samples_per_plugin text=0
+tensorboard --logdir ROOT_DIRECTORY/summary_tb --samples_per_plugin text=100000
 ```
 
 ### Logging your own metrics
