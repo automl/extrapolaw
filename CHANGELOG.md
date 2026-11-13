@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `chinchilla` optimizer for [Chinchilla](https://arxiv.org/abs/2203.15556) guided scaling studies.
 - Added scaling plots also with the inference cost in with CSV outputs and TensorBoard logging. `evaluate_pipeline` can return an `inference_cost` and `downstream_performances` next to the `cost`.
 - `evaluate_pipeline` can return the model size `n_params` and the amount of training data `n_data`, which `extrapolaw.predict()` uses.
+- Each scaling optimizer names the scaling law fitted on its runs (`ScalingOptimizer.predictor`, `chinchilla3` for `chinchilla`). `extrapolaw.predict()` and the `loss_over_cost` plot both use it.
+- `extrapolaw.predict()` also saves `summary/scaling/prediction.png`: the fit extended to the target budgets and the prediction history.
 
 ### Changed
 - **BREAKING:** Renamed `extrapolaw.run()` to `extrapolaw.acquire()`.

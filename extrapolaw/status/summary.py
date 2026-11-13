@@ -457,9 +457,10 @@ class SummaryWriter:
         n_objectives = len(_to_sequence(trials[0].report.objective_to_minimize))  # type: ignore[arg-type]
         try:
             if n_objectives == 1:
+                predictor, data_parameter_name = self._run_fit()
                 return plot_incumbent_trajectory(
                     trials, cumulative_usage, incumbent_ids
-                ) + plot_scaling(trials)
+                ) + plot_scaling(trials, predictor, data_parameter_name)
             if n_objectives == 2:
                 return plot_pareto_front(trials, pareto_ids)
         except Exception as e:  # noqa: BLE001
@@ -468,6 +469,18 @@ class SummaryWriter:
 
         logger.debug("No summary plot for %d objectives.", n_objectives)
         return []
+
+    def _run_fit(self) -> tuple[str, str | None]:
+        """The scaling law the run's optimizer names, and its data parameter if any."""
+        try:
+            info = _deserialize_optimizer_info(
+                self.root_directory / "optimizer_info.yaml"
+            )
+        except Exception:  # noqa: BLE001
+            return "power_law", None
+        predictor = info.get("derived", {}).get("predictor", "power_law")
+        data_parameter_name = info.get("info", {}).get("data_parameter_name")
+        return predictor, data_parameter_name
 
     def _optimizer_artifacts(self, trials: Mapping[str, Trial]) -> list[Artifact]:
         """Whatever the optimizer itself wants persisted, if it offers any."""

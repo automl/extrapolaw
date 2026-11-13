@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from extrapolaw.prediction import Prediction, PredictorTypes, Target
     from extrapolaw.space import SearchSpace
     from extrapolaw.state.pipeline_eval import EvaluatePipelineReturn, UserResultDict
+    from extrapolaw.state.trial import Trial
 
 logger = logging.getLogger(__name__)
 
@@ -739,7 +740,7 @@ def predict(  # noqa: PLR0913
         target_flops: The compute budget(s) to predict at.
         predictor: A [`PredictorTypes`][extrapolaw.prediction.PredictorTypes] or its
             name (`"power_law"`, `"chinchilla3"`, `"gp_posterior"`), or `"auto"` for
-            the one paired with the run's optimizer, `"power_law"` otherwise.
+            the one the run's optimizer names.
         targets: The [`Target`][extrapolaw.prediction.Target]s to predict. By default
             whatever the predictor provides, without `COARSE` when the trials have no
             model size and data.
@@ -765,8 +766,6 @@ def predict(  # noqa: PLR0913
     import numpy as np
 
     from extrapolaw.prediction import (
-        DEFAULT_PREDICTORS,
-        PredictorTypes,
         Target,
         fit_and_predict,
         get_predictor_type,
@@ -792,9 +791,8 @@ def predict(  # noqa: PLR0913
         stored = optimizer_info.get("info", {}).get("data_parameter_name")
         data_parameter_name = stored if isinstance(stored, str) else None
     if predictor == "auto":
-        predictor = DEFAULT_PREDICTORS.get(
-            optimizer_info["name"], PredictorTypes.POWER_LAW
-        )
+        predictor = optimizer_info.get("derived", {}).get("predictor", "power_law")
+
     predictor_type = get_predictor_type(predictor)
     # The GP posterior models the trials with the prior mean of the GP that acquired
     # them, the power law in the cost unless the optimizer recorded another
@@ -802,8 +800,9 @@ def predict(  # noqa: PLR0913
     if prior_mean not in ("power_law", "zero"):
         prior_mean = "power_law"
 
+    trials = list(state.lock_and_read_trials().values())
     rows, curves, configs = rows_from_trials(
-        state.lock_and_read_trials().values(),
+        trials,
         params_estimator=params_estimator,
         data_parameter_name=data_parameter_name,
         cost_estimator=cost_estimator,
@@ -832,7 +831,7 @@ def predict(  # noqa: PLR0913
         )
 
     budgets = [target_flops] if isinstance(target_flops, int | float) else target_flops
-    return fit_and_predict(
+    predictions = fit_and_predict(
         predictor_type,
         [float(flops) for flops in budgets],
         targets=targets,
@@ -848,6 +847,35 @@ def predict(  # noqa: PLR0913
         cache_dir=None if cache_dir is None else Path(cache_dir),
         prior_mean=prior_mean,
     )
+    _save_prediction_plot(
+        root_directory,
+        trials,
+        predictor_type.value,
+        [float(flops) for flops in budgets],
+        data_parameter_name,
+        params_estimator,
+    )
+    return predictions
+
+
+def _save_prediction_plot(
+    root_directory: Path,
+    trials: list[Trial],
+    predictor: str,
+    target_flops: list[float],
+    data_parameter_name: str | None,
+    params_estimator: Callable[..., float] | None,
+) -> None:
+    """Save `summary/scaling/prediction.png`."""
+    from extrapolaw.plot.scaling_plots import plot_prediction
+
+    try:
+        artifacts = plot_prediction(
+            trials, predictor, target_flops, data_parameter_name, params_estimator
+        )
+        SummaryWriter(root_directory=root_directory).write(artifacts)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Could not save the prediction plot: {e}")
 
 
 def import_trials(  # noqa: C901
