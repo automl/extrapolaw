@@ -83,21 +83,6 @@ def test_scaling_plots_are_written(tmp_path: Path) -> None:
     assert len(points) == table["on_frontier"].sum()
     assert set(points[0]["config"]) == {"width", "lr"}
 
-    events = _events(root / "summary_tb")
-    assert not events.Tags()["images"]
-    incumbent = [event.value for event in _incumbent(events)]
-    assert np.allclose(incumbent, np.minimum.accumulate(table["loss"]))
-    texts = events.Tensors("scaling/frontier/loss_over_cost/text_summary")
-    logged = max(texts, key=lambda event: event.step)
-    front = table[table["on_frontier"]].sort_values("cost")
-    points = [
-        f"({trial_id}, {loss:.4g}, {cost:.4g})"
-        for trial_id, loss, cost in zip(
-            front["trial_id"], front["loss"], front["cost"], strict=True
-        )
-    ]
-    assert logged.tensor_proto.string_val[0].decode() == ", ".join(points)
-
 
 def _events(log_dir: Path) -> EventAccumulator:
     events = EventAccumulator(str(log_dir), size_guidance={"scalars": 0, "tensors": 0})
@@ -119,12 +104,6 @@ def _frontiers(log_dir: Path) -> dict[int, str]:
     """The frontier of loss over cost at each step."""
     texts = _events(log_dir).Tensors("scaling/frontier/loss_over_cost/text_summary")
     return {event.step: event.tensor_proto.string_val[0].decode() for event in texts}
-
-
-def test_tensorboard_gets_each_run_once(tmp_path: Path) -> None:
-    root = tmp_path / "results"
-    _run(root, _scaling)
-    assert _incumbent_steps(root / "summary_tb") == [1, 2, 3, 4, 5, 6]
 
 
 def test_tensorboard_steps_stay_the_same(tmp_path: Path) -> None:
@@ -162,18 +141,19 @@ def test_tensorboard_is_fail_safe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     root = tmp_path / "results"
-    log_dir = root / "summary_tb"
     _run(root, _scaling)
+    state = ExtrapolawState.create_or_load(path=root, load_only=True)
+    trials = list(state._trial_repo.get_valid_evaluated_trials().values())
+    log_dir = tmp_path / "tensorboard"
     with monkeypatch.context() as patch, caplog.at_level(logging.WARNING):
         patch.setattr(scaling_plots, "FileLocker", _BusyLocker)
-        _run(root, _scaling)
+        scaling_plots.log_to_tensorboard(trials, log_dir)
     assert "TensorBoard is busy" in caplog.text
-    assert _incumbent_steps(log_dir) == [1, 2, 3, 4, 5, 6]
 
     # With the lock free again, the missed runs are logged, each with its frontier
-    extrapolaw.analyze(root)
-    assert _incumbent_steps(log_dir) == list(range(1, 13))
-    assert sorted(_frontiers(log_dir)) == list(range(1, 13))
+    scaling_plots.log_to_tensorboard(trials, log_dir)
+    assert _incumbent_steps(log_dir) == [1, 2, 3, 4, 5, 6]
+    assert sorted(_frontiers(log_dir)) == [1, 2, 3, 4, 5, 6]
 
 
 def test_no_scaling_plots_without_a_positive_cost(tmp_path: Path) -> None:
@@ -181,7 +161,7 @@ def test_no_scaling_plots_without_a_positive_cost(tmp_path: Path) -> None:
     _run(root, _zero_cost)
     extrapolaw.analyze(root)
 
-    assert (root / "summary" / "incumbent_trajectory.png").exists()
+    assert (root / "summary" / "full.csv").exists()
     assert not (root / "summary" / "scaling").exists()
 
 

@@ -304,8 +304,8 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 quickly.
 
         live_plots: If `True`, refresh the plots in the `summary` folder after every
-            evaluated trial: the general plots like pareto frontier/incumbent trajectory, plus any artifacts the optimizer
-            provides. Off by default, as plotting adds overhead to every evaluation.
+            evaluated trial: the scaling plots, or the Pareto front for two
+            objectives, plus any artifacts the optimizer provides. Off by default, as plotting adds overhead to every evaluation.
 
         worker_id: An optional string to identify the worker (run instance).
             If not provided, a `worker_id` will be automatically generated using the pattern:
@@ -609,10 +609,7 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
     SummaryWriter.from_directory(root_directory, live_plots=live_plots).update(final=True)
     summary_dir = root_directory / "summary"
     logger.info(
-        "The summary folder has been created, which contains csv and txt files with"
-        "the output of all data in the run (short.csv - only the best; full.csv - "
-        "all runs; best_config_trajectory.txt for incumbent trajectory; and "
-        "best_config.txt for final incumbent)."
+        "The summary folder has been created, with full.csv (all runs) and the plots."
         f"\nYou can find summary folder at: {summary_dir}."
     )
 

@@ -34,9 +34,8 @@ best configuration found so far. It only reads the run; it does not write any fi
     full_df, short = extrapolaw.status("ROOT_DIRECTORY", print_summary=True)
     ```
 
-    `full_df` has one row per trial (its config, report and metadata) and `short`
-    summarizes the run as a whole: the same content as `summary/full.csv` and
-    `summary/short.csv`.
+    `full_df` has one row per trial (its config, report and metadata), the same
+    content as `summary/full.csv`, and `short` summarizes the run as a whole.
 
 !!! tip "Using `watch`"
 
@@ -49,7 +48,7 @@ best configuration found so far. It only reads the run; it does not write any fi
 ## Plots and reports: `extrapolaw.analyze`
 
 [`extrapolaw.analyze()`][extrapolaw.api.analyze] rebuilds the `summary` folder of a run from what is
-on disk: the CSVs, the best-config text files and the plots. It does not evaluate
+on disk: `full.csv` and the plots. It does not evaluate
 anything, so you can call it
 
 - after a run has finished, in particular one that ran without `live_plots=True`;
@@ -69,22 +68,11 @@ extrapolaw.analyze("ROOT_DIRECTORY")
 What Extrapolaw draws depends on how many objectives your `evaluate_pipeline` returns. Every
 figure comes with a CSV of the exact points it shows, so you can re-plot them your own way.
 
-| Objectives | Files in `summary/`                                    | Plot                                          |
-| ---------- | ------------------------------------------------------ | --------------------------------------------- |
-| 1          | `incumbent_trajectory.png`, `incumbent_trajectory.csv` | [Incumbent trajectory](#incumbent-trajectory) |
-| 2          | `pareto_front.png`, `pareto_front.csv`                 | [Pareto front](#pareto-front)                 |
-| 3 or more  | none                                                   | `best_config.txt` still lists the Pareto set  |
-
-Single-objective runs that report a `cost` also get [scaling plots](#scaling-plots).
-
-#### Incumbent trajectory
-
-Every evaluated objective (grey) and the best one found so far (blue), against the
-cumulative cost, or against the number of evaluations if `evaluate_pipeline` never
-reported a cost.
-
-![Incumbent trajectory](../doc_images/analyse/incumbent_trajectory.png)
-
+| Objectives | Plots                                                              |
+| ---------- | ------------------------------------------------------------------ |
+| 1          | [Scaling plots](#scaling-plots), if the runs report a cost         |
+| 2          | [Pareto front](#pareto-front): `pareto_front.png`, `pareto_front.csv` |
+| 3 or more  | none                                                               |
 
 #### Pareto front
 
@@ -149,43 +137,18 @@ ROOT_DIRECTORY
 │   └── ...
 ├── summary
 │   ├── full.csv                        # One row per trial
-│   ├── short.csv                       # The run as a whole
-│   ├── best_config.txt                 # The incumbent, or the Pareto set
-│   ├── best_config_trajectory.txt      # Every config that became the incumbent
-│   ├── incumbent_trajectory.{png,csv}  # 1 objective, with plots on
 │   ├── pareto_front.{png,csv}          # 2 objectives, with plots on
 │   └── scaling/                        # Scaling plots, if the runs report a cost
-├── summary_tb/                         # Scaling data for TensorBoard
 ├── optimizer_info.yaml                 # The optimizer's configuration
 ├── optimizer_state.pkl                 # The optimizer's state, shared between workers
 └── pipeline_space.pkl                  # The search space
 ```
 
 `full.csv` has every trial's hyperparameters, together with whatever result and cost
-`evaluate_pipeline` returned. `best_config_trajectory.txt` logs the incumbent trajectory
-(single objective only) and `best_config.txt` records the current incumbent(s).
-
+`evaluate_pipeline` returned.
 
 # TensorBoard integration
 
-
-### Scaling data
-
-For runs that report a `cost`, Extrapolaw logs to `ROOT_DIRECTORY/summary_tb` after
-every evaluation, with or without `live_plots`, one step per run:
-
-- `scaling/incumbent/loss`: the best loss so far;
-- `scaling/frontier/<metric>_over_<cost>`: the runs on each Pareto frontier so far, as
-  `(trial id, value, cost)`, for the loss and each downstream metric, over the cost
-  and the inference cost.
-
-The trial ids match `summary/full.csv`. Logging to TensorBoard never stops a run: if
-it fails, it only warns and catches up at the next update. TensorBoard shows only 10
-text entries per tag by default, so to see the frontier at every step, start it with
-
-```bash
-tensorboard --logdir ROOT_DIRECTORY/summary_tb --samples_per_plugin text=100000
-```
 
 ### Logging your own metrics
 
