@@ -701,8 +701,9 @@ def analyze(root_directory: str | Path) -> None:
 
 def predict(  # noqa: PLR0913
     root_directory: str | Path,
-    target_flops: float | Sequence[float],
+    target_flops: float | Sequence[float] | None = None,
     *,
+    target_inference_costs: float | Sequence[float] | None = None,
     predictor: str | PredictorTypes = "auto",
     targets: Iterable[Target] | None = None,
     params_estimator: Callable[..., float] | None = None,
@@ -717,7 +718,8 @@ def predict(  # noqa: PLR0913
     """Extrapolate the evaluated trials of a run to larger compute budgets.
 
     The predictor is fitted once per target on the trials, then queried at every
-    budget.
+    budget. The target costs are saved to `summary/targets.json`, with the scaling
+    plots and predictions at them and how the predictions converged.
 
     ```python
     predictions = extrapolaw.predict(
@@ -734,7 +736,11 @@ def predict(  # noqa: PLR0913
     Args:
         root_directory: Root directory of the Extrapolaw run. The flops of a trial are
             the cost it reported, or what `cost_estimator` gives for it.
-        target_flops: The compute budget(s) to predict at.
+        target_flops: The compute budget(s) to predict at, 10 and 100 times the
+            largest of the trials by default.
+        target_inference_costs: The inference cost(s) the saved predictions over the
+            inference cost are at, 10 and 100 times the largest of the trials by
+            default.
         predictor: A [`PredictorTypes`][extrapolaw.prediction.PredictorTypes] or its
             name (`"power_law"`, `"chinchilla3"`, `"gp_posterior"`), or `"auto"` for
             the one the run's optimizer names.
@@ -827,10 +833,10 @@ def predict(  # noqa: PLR0913
             " which predicting the full configuration needs."
         )
 
-    budgets = [target_flops] if isinstance(target_flops, int | float) else target_flops
+    target_costs = _target_costs(rows, target_flops, target_inference_costs)
     predictions = fit_and_predict(
         predictor_type,
-        [float(flops) for flops in budgets],
+        target_costs["cost"],
         targets=targets,
         rows=rows,
         configs=configs,
@@ -844,35 +850,52 @@ def predict(  # noqa: PLR0913
         cache_dir=None if cache_dir is None else Path(cache_dir),
         prior_mean=prior_mean,
     )
-    _save_prediction_plot(
-        root_directory,
-        trials,
-        predictor_type.value,
-        [float(flops) for flops in budgets],
-        data_parameter_name,
-        params_estimator,
-    )
+    _save_predictions(root_directory, trials, predictor_type.value, target_costs, space)
     return predictions
 
 
-def _save_prediction_plot(
+def _target_costs(
+    rows: list,
+    target_flops: float | Sequence[float] | None,
+    target_inference_costs: float | Sequence[float] | None,
+) -> dict[str, list[float]]:
+    """The target costs by cost: those given, and for the training cost otherwise 10
+    and 100 times the largest of the rows.
+    """
+    import numpy as np
+
+    from extrapolaw.plot.scaling_plots import DEFAULT_TARGETS
+
+    if target_flops is None:
+        largest = max((row[3] for row in rows if row[3] > 0), default=0.0)
+        target_flops = [factor * largest for factor in DEFAULT_TARGETS]
+    target_costs = {"cost": np.atleast_1d(target_flops).astype(float).tolist()}
+    if target_inference_costs is not None:
+        costs = np.atleast_1d(target_inference_costs).astype(float).tolist()
+        target_costs["inference_cost"] = costs
+    return target_costs
+
+
+def _save_predictions(
     root_directory: Path,
     trials: list[Trial],
     predictor: str,
-    target_flops: list[float],
-    data_parameter_name: str | None,
-    params_estimator: Callable[..., float] | None,
+    target_costs: dict[str, list[float]],
+    space: SearchSpace | None,
 ) -> None:
-    """Save `summary/scaling/prediction.png`."""
-    from extrapolaw.plot.scaling_plots import plot_prediction
+    """Save `target_costs` to `summary/targets.json`, and the scaling plots,
+    predictions and convergence at them.
+    """
+    from extrapolaw.optimizers.optimizer import Artifact, ArtifactType
+    from extrapolaw.plot.scaling_plots import plot_convergence, plot_scaling
 
     try:
-        artifacts = plot_prediction(
-            trials, predictor, target_flops, data_parameter_name, params_estimator
-        )
+        artifacts = [Artifact("targets", target_costs, ArtifactType.JSON)]
+        artifacts += plot_scaling(trials, predictor, target_costs, space)
+        artifacts += plot_convergence(trials, predictor, target_costs)
         SummaryWriter(root_directory=root_directory).write(artifacts)
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"Could not save the prediction plot: {e}")
+        logger.warning(f"Could not save the predictions: {e}")
 
 
 def import_trials(  # noqa: C901

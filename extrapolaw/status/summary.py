@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -12,7 +13,11 @@ from typing import TYPE_CHECKING, Any
 from extrapolaw.optimizers.optimizer import Artifact, ArtifactType
 from extrapolaw.plot.generic_plots import plot_pareto_front
 from extrapolaw.plot.scaling_plots import plot_scaling
-from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import ExtrapolawCompatConverter
+from extrapolaw.space.extrapolaw_spaces.extrapolaw_space import (
+    ExtrapolawCompatConverter,
+    convert_extrapolaw_to_classic_search_space,
+)
+from extrapolaw.space.extrapolaw_spaces.parameters import PipelineSpace
 from extrapolaw.state.extrapolaw_state import ExtrapolawState, _deserialize_optimizer_info
 from extrapolaw.state.trial import Trial
 from extrapolaw.status.status import _initiate_summary_csv, status
@@ -20,6 +25,7 @@ from extrapolaw.utils.files import get_file_writer
 from extrapolaw.utils.pareto import dominates
 
 if TYPE_CHECKING:
+    from extrapolaw.space import SearchSpace
     from extrapolaw.state.extrapolaw_state import FileLocker
 
 logger = logging.getLogger(__name__)
@@ -352,8 +358,9 @@ class SummaryWriter:
         n_objectives = len(_to_sequence(trials[0].report.objective_to_minimize))  # type: ignore[arg-type]
         try:
             if n_objectives == 1:
-                predictor, data_parameter_name = self._run_fit()
-                return plot_scaling(trials, predictor, data_parameter_name)
+                return plot_scaling(
+                    trials, self._run_fit(), self._target_costs(), self._search_space()
+                )
             if n_objectives == 2:
                 return plot_pareto_front(trials, pareto_ids)
         except Exception as e:  # noqa: BLE001
@@ -363,17 +370,33 @@ class SummaryWriter:
         logger.debug("No summary plot for %d objectives.", n_objectives)
         return []
 
-    def _run_fit(self) -> tuple[str, str | None]:
-        """The scaling law the run's optimizer names, and its data parameter if any."""
+    def _run_fit(self) -> str:
+        """The scaling law the run's optimizer names."""
         try:
             info = _deserialize_optimizer_info(
                 self.root_directory / "optimizer_info.yaml"
             )
         except Exception:  # noqa: BLE001
-            return "power_law", None
-        predictor = info.get("derived", {}).get("predictor", "power_law")
-        data_parameter_name = info.get("info", {}).get("data_parameter_name")
-        return predictor, data_parameter_name
+            return "power_law"
+        return info.get("derived", {}).get("predictor", "power_law")
+
+    def _target_costs(self) -> dict[str, list[float]] | None:
+        """The target costs of the last `extrapolaw.predict()`, if any."""
+        path = self.summary_dir / "targets.json"
+        return json.loads(path.read_text()) if path.exists() else None
+
+    def _search_space(self) -> SearchSpace | None:
+        """The search space of the run, of the classic kind the scaling laws take."""
+        try:
+            state = ExtrapolawState.create_or_load(
+                path=self.root_directory, load_only=True
+            )
+            space = state.lock_and_get_search_space()
+            if isinstance(space, PipelineSpace):
+                return convert_extrapolaw_to_classic_search_space(space)
+        except Exception:  # noqa: BLE001
+            return None
+        return space
 
     def _optimizer_artifacts(self, trials: Mapping[str, Trial]) -> list[Artifact]:
         """Whatever the optimizer itself wants persisted, if it offers any."""
