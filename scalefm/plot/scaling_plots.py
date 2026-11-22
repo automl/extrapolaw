@@ -360,15 +360,6 @@ def _predictions(fit: pd.DataFrame, metric: str, cost: str) -> pd.DataFrame:
     return table.rename(columns={cost: f"target_{cost}", metric: _name(metric)})
 
 
-def _tables(name: str, table: pd.DataFrame) -> list[Artifact]:
-    """`table` as a CSV, and aligned in a text file to read."""
-    text = table.to_string(index=False, float_format="{:.4g}".format)
-    return [
-        Artifact(name, table, ArtifactType.CSV),
-        Artifact(name, text + "\n", ArtifactType.TEXT),
-    ]
-
-
 def plot_scaling(
     trials: Sequence[Trial],
     predictor: str = "power_law",
@@ -434,21 +425,21 @@ def plot_scaling(
                 Artifact(name, figure, ArtifactType.FIGURE),
                 Artifact(name, points, ArtifactType.CSV),
             ]
-            artifacts += _tables(
-                f"{folder}/pareto_over_{cost}", _pareto(runs, metric, cost, configs)
+            pareto = _pareto(runs, metric, cost, configs)
+            artifacts.append(
+                Artifact(f"{folder}/pareto_over_{cost}", pareto, ArtifactType.CSV)
             )
             if metric in fit:
-                artifacts += _tables(
-                    f"{folder}/predictions_over_{cost}", _predictions(fit, metric, cost)
+                predictions = _predictions(fit, metric, cost)
+                artifacts.append(
+                    Artifact(
+                        f"{folder}/predictions_over_{cost}", predictions, ArtifactType.CSV
+                    )
                 )
             for parameter in parameters:
                 name = f"{folder}/parameters/{parameter.replace('.', '_')}_over_{cost}"
                 figure = plot_parameter_over_cost(runs, parameter, cost, fit, label)
-                columns = ["trial_id", cost, parameter, "loss", "on_frontier"]
-                artifacts += [
-                    Artifact(name, figure, ArtifactType.FIGURE),
-                    Artifact(name, runs[columns], ArtifactType.CSV),
-                ]
+                artifacts.append(Artifact(name, figure, ArtifactType.FIGURE))
     return artifacts
 
 
