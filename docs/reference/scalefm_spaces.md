@@ -35,7 +35,7 @@ class MySpace(scalefm.PipelineSpace):
 
     For more details on how to use the `scalefm.acquire()` function, see the [ScaleFM Run Reference](../reference/scalefm_acquire.md).
 
-### Providing a [**Fidelity**](../reference/search_algorithms/landing_page_algo.md#fidelities) Parameter
+### Providing a **Fidelity** Parameter
 
 You can use [`scalefm.IntegerFidelity`][scalefm.space.scalefm_spaces.parameters.IntegerFidelity] or [`scalefm.FloatFidelity`][scalefm.space.scalefm_spaces.parameters.FloatFidelity] to mark a parameter that sets how much is spent on an evaluation, e.g. the number of epochs. The optimizers set it to its maximum or treat it like any other parameter, see `ignore_fidelity`:
 
@@ -47,8 +47,6 @@ subset_ratio = scalefm.FloatFidelity(lower=0.1, upper=1.0)
 # Alternative syntax (also works)
 epochs = scalefm.IntegerFidelity(1, 16)
 ```
-
-For more details on how the optimizers use fidelity parameters, see the [Fidelities](../reference/search_algorithms/landing_page_algo.md#fidelities) section.
 
 ### Using your knowledge, providing a [**Prior**](../reference/search_algorithms/landing_page_algo.md#priors)
 
@@ -212,7 +210,7 @@ def evaluate_pipeline(cnn: torch.nn.Module):
 
 !!! tip "Complex structural spaces"
 
-    Together, [Resampling][scalefm.space.scalefm_spaces.parameters.Resample] and [operations][scalefm.space.scalefm_spaces.parameters.Operation] allow you to define complex search spaces across the whole ML-pipeline akin to [Context-Free Grammars (CFGs)](https://en.wikipedia.org/wiki/Context-free_grammar), exceeding architecture search. For example, you can sample neural optimizers from a set of instructions, as done in [this example](../examples/basic_usage/5_optimizer_search.md) to train models.
+    Together, [Resampling][scalefm.space.scalefm_spaces.parameters.Resample] and [operations][scalefm.space.scalefm_spaces.parameters.Operation] allow you to define complex search spaces across the whole ML-pipeline akin to [Context-Free Grammars (CFGs)](https://en.wikipedia.org/wiki/Context-free_grammar), exceeding architecture search. For example, you can sample neural optimizers from a set of instructions to train models.
 
 ## Inspecting Configurations
 

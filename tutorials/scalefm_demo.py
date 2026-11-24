@@ -19,34 +19,39 @@
 # training many smaller models, fitting a scaling law to them, and then extrapolating
 # to the target cost.
 #
-# Where this notebook gets to, extrapolating 20x beyond the largest run (replace with default later!):
+# Where this notebook gets to, extrapolating 20x beyond the largest run:
 #
 # <table>
 #   <tr>
 #     <td align="center"><img src="static/chinchilla_loss_over_cost.png" width="360"><br><b>Loss</b>: a power law through the compute-loss frontier</td>
-#     <td align="center"><img src="static/total_cells_over_cost.png" width="360"><br><b>A hyperparameter</b>: the data, <code>total_cells</code>, of the frontier runs</td>
+#     <td align="center"><img src="static/total_cells_over_cost.png" width="360"><br><b>A hyperparameter</b>: the data, <code>total_cells</code>, of the frontier runs + Extrapolated point</td>
 #   </tr>
 # </table>
 #
-# ScaleFM automates the four parts of that:
+# ScaleFM automates that via this five components:
 #
-# 1. **Acquisition.** Deciding which small runs to train within a compute budget:
+# 1. ** Search space** `scalefm.PipelineSpace` declares the hyperparameters of a run as
+#    `scalefm.Integer` or `scalefm.Float`, on a linear or log scale. Each one is either a
+#    compute-scaling parameter (`is_compute_scaling=True`), such as the model size or the
+#    amount of data, or an ordinary hyperparameter, such as the learning rate. ScAn uses
+#    this split natively.
+# 2. **Acquisition.** Deciding which small runs to train within a compute budget:
 #    random search (the default), Chinchilla's approach 1, CARBS, or **ScAn**, Bayesian
 #    optimization that picks the runs that reveal most about the best loss at the target
 #    compute.
-# 2. **Prediction.** `scalefm.predict` fits the runs with a power law, Chinchilla's
+# 3. **Prediction.** `scalefm.predict` fits the runs with a power law, Chinchilla's
 #    $L(N, D)$ or a Gaussian process, and returns the loss, the compute-optimal model
 #    size and data, and a full config at any target compute.
-# 3. **Running at scale.** Many workers, processes, Slurm jobs or machines, share one
+# 4. **Running at scale.** Many workers, processes, Slurm jobs or machines, share one
 #    FLOP budget through the filesystem, configs can be handed off to jobs that report
 #    back later, and a single run can train on many GPUs with PyTorch DDP.
-# 4. **Visualization.** `scalefm.predict` writes the scaling fits of the loss and of
+# 5. **Visualization.** `scalefm.predict` writes the scaling fits of the loss and of
 #    every downstream metric, the predictions at the target compute and how they
 #    converged as runs finished; `acquire` adds live plots.
 #
-# This notebook scales [TabPFN](https://github.com/PriorLabs/TabPFN), a transformer
+# This notebook analyzes scaling behaviour of [TabPFN](https://github.com/PriorLabs/TabPFN), a transformer
 # for tabular data, on a surrogate benchmark built from thousands of real training
-# runs.
+# runs on NanoTabPFN.
 
 # ## Installation
 # Requires Python 3.11+. In Colab, run the cell below; locally, see the
@@ -101,11 +106,11 @@ def show(*images, width=480):
 #
 # Here, the surrogate benchmark of `scan_bench` stands in for the training: it predicts
 # what a TabPFN training run would reach, its validation loss and its negative
-# log-likelihood on real tabular datasets, a **downstream** metric.
+# log-likelihood on real tabular datasets, a downstream metric.
 
 # +
 loss_benchmark = tabpfn.get_benchmark(TabPFNTarget.VAL_LOSS)
-nll_benchmark = tabpfn.get_benchmark(TabPFNTarget.NLL)  # Fitted on first use, ~20s
+nll_benchmark = tabpfn.get_benchmark(TabPFNTarget.NLL)
 
 
 def evaluate_pipeline(**config) -> dict:
@@ -150,7 +155,7 @@ print(f"{tabpfn.flops_estimator(**config):.3e} FLOPs")
 # `total_cells`.
 
 class TabPFNSpace(scalefm.PipelineSpace):
-    # Compute-scaling parameters: the model size and the data
+    # Compute-scaling parameters
     total_cells = scalefm.Integer(2**20, 2**35, log=True, log_base=2, is_compute_scaling=True)
     embedding_size = scalefm.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
     num_layers = scalefm.Integer(2, 32, log=True, log_base=2, is_compute_scaling=True)
@@ -167,15 +172,14 @@ RESULTS = Path("results/scaling_tutorial")
 
 MAX_COST_PER_RUN = 2.8e14
 BUDGET = MAX_COST_PER_RUN * 10
-TARGET = 5.6e15
-TARGETS = [TARGET]
+TARGETS = [5.6e15]  # 20x bigger than the max search cost
 
 
 # -
 
 # ## Three extrapolations: loss, model size and full config
 #
-# ![Data acquisition, then extrapolation to the loss, model size and full config at the target FLOPs](../docs/doc_images/tutorials/scaling_pipeline.png)
+# ![Data acquisition, then extrapolation to the loss, model size and full config at the target FLOPs](static/scaling_pipeline.png)
 #
 # A study has two steps. The **acquisition** trains the small runs within the budget.
 # The **extrapolation**, `scalefm.predict`, fits a predictor to them and predicts at
@@ -187,11 +191,11 @@ TARGETS = [TARGET]
 #
 # Not every predictor gives all three:
 #
-# | predictor | fits | $L^*$ | $N^*$, $D^*$ | $\lambda^*$ |
-# |---|---|---|---|---|
-# | `chinchilla3` | Chinchilla's law $L(N, D)$ | yes | yes | no |
-# | `power_law` | straight lines in log-log through the frontier runs | yes | yes | yes (ignores joint dependency of HPs) |
-# | `gp_posterior` | a Gaussian process over the full config | yes | yes | yes |
+# | predictor | fits | $L^*$ | $N^*$, $D^*$ | $\lambda^*$ | Comment |
+# |---|---|---|---|---|---|
+# | `chinchilla3` | Chinchilla's law $L(N, D)$ | yes | yes | no | -|
+# | `power_law` | straight lines in log-log through the frontier runs | yes | yes | yes | ignores joint dependency of HPs |
+# | `gp_posterior` | a Gaussian process over the full config | yes | yes | yes | - |
 #
 # With `predictor="auto"`, the default, `predict` uses the predictor of the
 # optimizer that acquired the runs: `chinchilla3` for Chinchilla, `power_law` for
@@ -203,23 +207,41 @@ TARGETS = [TARGET]
 # its parameter count in cells (`data_multipliers`), and grows the models until the
 # budget is spent. From these runs it reads off the lowest loss at each compute, the
 # compute-optimal frontier. Like the Chinchilla paper it keeps a fixed training recipe,
-# so it runs on a version of the space with constant hyperparameters and a fixed depth:
+# so it runs on a version of the space with constant hyperparameters. Each run also
+# reports its learning curve, as rows of (cells seen, FLOPs, loss), and approach 1
+# reads the frontier off the curves rather than only off the final losses:
 
 # +
 class TabPFNChinchillaSpace(scalefm.PipelineSpace):
+    # Compute-scaling parameters
     total_cells = scalefm.Integer(2**20, 2**35, log=True, log_base=2, is_compute_scaling=True)
     embedding_size = scalefm.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
-    # The fixed recipe
-    num_layers = 2
-    effective_batch_size = 64
-    lr = 1e-3
+    # The other hyperparameters
+    num_layers = 2 # scalefm.Integer(2, 32, log=True, log_base=2, is_compute_scaling=True)
+    effective_batch_size = 64 # effective_batch_size = scalefm.Integer(16, 256, log=True, log_base=2)
+    lr = 1e-3 # lr = scalefm.Float(1e-4, 5e-2, log=True)
+
+
+def evaluate_pipeline_with_lc(**config) -> dict:
+    """`evaluate_pipeline`, also reporting the learning curve of the run."""
+    result = evaluate_pipeline(**config)
+    flops_per_cell = result["cost"] / result["n_data"]
+    # The surrogate has no checkpoints: a checkpoint is the same run on fewer cells
+    cells = [int(result["n_data"] * 2 ** (-k / 2)) for k in range(8, -1, -1)]
+    cells = [c for c in cells if c >= tabpfn.MIN_CELLS]
+    runs = [tabpfn.build_config(**{**config, "total_cells": c}) for c in cells]
+    losses = [r["predictions"]["mean"] for r in loss_benchmark.query_many(runs)]
+    result["learning_curve"] = [  # Rows of (cells seen, FLOPs, loss)
+        [c, c * flops_per_cell, loss] for c, loss in zip(cells, losses)
+    ]
+    return result
 
 
 CHINCHILLA1 = RESULTS / "chinchilla1"
 
 tabpfn.set_seed(0)
 scalefm.acquire(
-    evaluate_pipeline=evaluate_pipeline,
+    evaluate_pipeline=evaluate_pipeline_with_lc,
     pipeline_space=TabPFNChinchillaSpace(),
     root_directory=CHINCHILLA1,
     optimizer=(
@@ -238,16 +260,24 @@ scalefm.acquire(
 )
 # -
 
+# ### Learning curves and their envelope
+#
+# The lowest loss any run reached at each compute is the envelope of the learning
+# curves, the compute-optimal frontier. Approach 1 plots the curves, coloured by model
+# size, with their envelope and a power law through it to `summary/`:
+
+show(CHINCHILLA1 / "summary/flops_vs_loss_with_lc.png", width=640)
+
 # ### Loss and model size with `chinchilla3`
 #
 # `scalefm.predict` reads the runs back from the root directory and fits the
 # predictor of the optimizer, here Chinchilla's approach 3 law $L(N, D)$:
 
 (chinchilla_prediction,) = scalefm.predict(CHINCHILLA1, target_costs=TARGETS)
-print(f"C={TARGET:.1e}: loss {chinchilla_prediction.loss:.3f},"
+print(f"C={TARGETS[0]:.1e}: loss {chinchilla_prediction.loss:.3f},"
       f" N*={chinchilla_prediction.n_params:.2e},"
       f" D*={chinchilla_prediction.n_data:.2e}")
-print("config:", chinchilla_prediction.config)
+print("config:", chinchilla_prediction.config) # Will retun None as Chinchilla fit doesn't model parameter space
 
 # ### The scaling plots
 #
@@ -258,13 +288,11 @@ show(CHINCHILLA1 / "summary/pre_train/loss_over_cost.png",
      *[CHINCHILLA1 / f"summary/pre_train/parameters/{name}_over_cost.png"
        for name in ["n_params", "n_data"]])
 
-# The config is `None`: $L(N, D)$ knows only the model size and data, not the width,
-# the depth or the number of cells that make them up, nor the other hyperparameters.
-# The default pipeline below predicts a full config.
+# The config is `None`: $L(N, D)$ fit doesn't model parameter space directly. Let's fallback to `power_law fit` to model all underlying HPs and predict their corresponding value in target regime.
 
 # ## 2. The default scaling pipeline
 #
-# Without an `optimizer`, `acquire` uses random search: it samples configs of the
+# By default, `acquire` uses random search: it samples configs of the
 # whole space, the hyperparameters included, each costing at most `max_cost_per_config`,
 # until the budget is spent. `predict` with its default `predictor="auto"` then fits
 # `power_law`, the predictor of random search, which also predicts every hyperparameter.
@@ -284,7 +312,7 @@ scalefm.acquire(
 )
 
 (prediction,) = scalefm.predict(DEFAULT, target_costs=TARGETS)
-print(f"C={TARGET:.1e}: loss {prediction.loss:.3f},"
+print(f"C={TARGETS[0]:.1e}: loss {prediction.loss:.3f},"
       f" N*={prediction.n_params:.2e}, D*={prediction.n_data:.2e}")
 print("config:", prediction.config)
 show(DEFAULT / "summary/pre_train/loss_over_cost.png")
@@ -296,8 +324,7 @@ show(DEFAULT / "summary/pre_train/loss_over_cost.png")
 # target:
 
 show(*[DEFAULT / f"summary/pre_train/parameters/{name}_over_cost.png"
-       for name in ["embedding_size", "num_layers", "total_cells", "lr",
-                    "effective_batch_size"]],
+       for name in ["total_cells", "lr",]],
      width=420)
 
 # The prediction at each target, loss, model size, data and config, is saved as a
@@ -319,7 +346,7 @@ show(DEFAULT / "summary/downstream/real_nll/real_nll_over_cost.png")
 
 show(DEFAULT / "summary/pre_train/loss_over_inference_cost.png")
 
-# ## 5. Parallel workers
+# ## 5. Parallel workers [for you to try!]
 #
 # A real study runs many trainings at once. With ScaleFM you start the same
 # `acquire` call several times, as processes on the same machine, or as Slurm jobs on
@@ -361,9 +388,7 @@ for p in processes:
     p.join()
 # -
 
-# The three workers split the runs between them. Together they spent the budget (plus
-# the runs still training when it ran out) in about a third of the time the training
-# takes one after the other:
+# The three workers split the runs between them:
 
 full, _ = scalefm.status(PARALLEL)
 training_time = (full["cost"] / tabpfn.SIMULATED_FLOPS_PER_SECOND).sum()
@@ -372,7 +397,7 @@ print(f"{full['cost'].sum():.2e} FLOPs spent of {BUDGET:.2e}")
 print(f"training time {training_time:.0f}s, wall clock {wall_clock:.0f}s")
 full.groupby("evaluating_worker_id")["cost"].agg(runs="count", flops="sum")
 
-# ## 6. Asynchronous sampling and multi-GPU jobs
+# ## 6. Asynchronous sampling and multi-GPU jobs [for you to try!]
 #
 # On a cluster you rarely keep a worker alive for the whole study. Instead you sample
 # configs, hand each one to a job sized for it, and collect the results as the jobs
@@ -492,4 +517,4 @@ full[["config.embedding_size", "config.num_layers", "config.total_cells",
 # 2. **Predict** loss, model size and data, and a full config (`power_law` or
 #    `gp_posterior`; not `chinchilla3`), for the loss and every downstream metric.
 # 3. Check the scaling plots in `summary/`, over the training and the inference cost.
-# 4. **Scale out**: workers share one budget, async jobs report back, DDP works.
+# 4. **Parallelization**: workers share one budget, async jobs report back, DDP works.

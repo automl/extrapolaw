@@ -4,7 +4,7 @@
 
 For a scaling study, the [scaling optimizers](#3-scaling-optimizers) build the scaling law into the search: [`chinchilla`](#32-chinchilla-guided-scaling) splits the compute between model size and data, and [`carbs`](#31-carbs) searches along the pareto front of objective and cost. To sample a space without assumptions on how it scales, use `random_search` or `grid_search`, and `bayesian_optimization` to find good configurations with fewer evaluations.
 
-Fidelity parameters and priors in the search space are optional, see [fidelities](../reference/search_algorithms/landing_page_algo.md#fidelities) and [priors](../reference/search_algorithms/landing_page_algo.md#priors) for the optimizers that use them.
+Fidelity parameters and priors in the search space are optional, see [priors](../reference/search_algorithms/landing_page_algo.md#priors) for the optimizers that use them.
 
 ## 2 ScaleFM Optimizer Selection
 
@@ -12,16 +12,16 @@ Fidelity parameters and priors in the search space are optional, see [fidelities
 
 The [algorithms](../reference/search_algorithms/landing_page_algo.md) section goes into detail on each optimizer. This chapter focusses on how to select them when using ScaleFM.
 
-✅ = supported/necessary, ❌ = not supported, ✔️* = optional, click for details, ✖️\* ignorable, click for details
+✅ = supported/necessary, ❌ = not supported, ✔️* = optional, click for details
 
-| Algorithm         | [Fidelity](../reference/search_algorithms/landing_page_algo.md#fidelities) | [Priors](../reference/search_algorithms/landing_page_algo.md#priors) | Model-based | [ScaleFM-ready](../reference/scalefm_spaces.md#3-constructing-architecture-spaces) |
-| :- | :------------: | :----: | :---------: | :-----------------: |
-| `Grid Search`|[️️✖️*][scalefm.optimizers.algorithms.grid_search]|❌|❌|✅|
-| `Random Search`|[️️✖️*][scalefm.optimizers.algorithms.random_search]|[✔️*][scalefm.optimizers.algorithms.random_search]|❌|✅|
-| `Complex Random Search`|[️️✖️*][scalefm.optimizers.algorithms.complex_random_search]|❌|❌|✅|
-| [`Bayesian Optimization`](../reference/search_algorithms/bayesian_optimization.md)|[️️✖️*][scalefm.optimizers.algorithms.bayesian_optimization]|❌|✅|❌|
-| [`CARBS`](#31-carbs)|❌|[✔️*][scalefm.optimizers.algorithms.carbs]|✅|❌|
-| [`Chinchilla`](#32-chinchilla-guided-scaling)|❌|❌|❌|❌|
+| Algorithm         | [Priors](../reference/search_algorithms/landing_page_algo.md#priors) | Model-based |
+| :- | :----: | :---------: |
+| `Grid Search`|❌|❌|
+| `Random Search`|[✔️*][scalefm.optimizers.algorithms.random_search]|❌|
+| `Complex Random Search`|❌|❌|
+| [`Bayesian Optimization`](../reference/search_algorithms/bayesian_optimization.md)|❌|✅|
+| [`CARBS`](#31-carbs)|[✔️*][scalefm.optimizers.algorithms.carbs]|✅|
+| [`Chinchilla`](#32-chinchilla-guided-scaling)|❌|❌|
 
 Without an `optimizer`, `scalefm.acquire()` uses [`random_search`][scalefm.optimizers.algorithms.random_search].
 Pass `"auto"` instead to let ScaleFM choose the optimizer based on your search space

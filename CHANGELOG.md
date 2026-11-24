@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING:** Multi-objective optimization. `objective_to_minimize` must be a single float, and `bayesian_optimization` no longer takes a `reference_point`.
 - **BREAKING:** `worker_fidelities_to_spend` and `total_fidelities_to_spend` of `scalefm.acquire()`, and the checkpoint helpers `load_checkpoint`, `save_checkpoint` and `load_lightning_checkpoint`.
 - **BREAKING:** `scalefm.plot()` and `python -m scalefm.plot`, the incumbent trajectory plots carried over from NePS.
-- The NePS tutorials, and the examples on expert priors, multi-fidelity, multi-objective, freeze-thaw and image segmentation HPO.
+- The NePS tutorials, the basic usage and ask-and-tell examples, and the examples on expert priors, multi-fidelity, multi-objective, freeze-thaw and image segmentation HPO.
 - The `ifbo` and `seaborn` dependencies.
 
 ScaleFM was forked from [NePS](https://github.com/automl/neps) 0.17.0. The earlier history is in [CHANGELOG_NEPS.md](CHANGELOG_NEPS.md).

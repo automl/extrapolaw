@@ -4,6 +4,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/scalefm)](https://pypi.org/project/scalefm/)
 [![License](https://img.shields.io/pypi/l/scalefm?color=informational)](https://github.com/automl/scalefm/blob/master/LICENSE)
 [![Tests](https://github.com/automl/scalefm/actions/workflows/tests.yaml/badge.svg)](https://github.com/automl/scalefm/actions)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/scalefm/blob/master/tutorials/scalefm_demo.ipynb)
 
 ScaleFM is a tool for scaling studies of deep learning pipelines: it searches how architectural and hyperparameter choices behave as you scale models, data, and compute, and fits scaling laws to predict the best choices at larger scales.
 Use it from a single GPU to a multi-node cluster or even multiple clusters.
@@ -152,8 +153,6 @@ The [ScaleFM Demo](https://colab.research.google.com/github/automl/scalefm/blob/
 - **The basic pipeline:** define the `evaluate_pipeline` and the search space, acquire runs within a FLOP budget, and predict the loss and the compute-optimal config at a larger target compute.
 - **Visualization:** the scaling plots and the predictions that ScaleFM writes for the loss and the downstream metrics.
 - **Parallelisation of the runs:** several workers sharing one FLOP budget, and asynchronous multi-GPU jobs.
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/scalefm/blob/master/tutorials/scalefm_demo.ipynb)
 
 To run it locally instead, see the [tutorials folder](https://github.com/automl/scalefm/tree/master/tutorials).
 

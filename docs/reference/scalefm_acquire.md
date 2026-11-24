@@ -9,8 +9,10 @@ This document breaks down the core arguments that allow users to control the opt
 ---
 
 ## Required Arguments
-To operate, ScaleFM requires at minimum the following two arguments
-[`scalefm.acquire(evaluate_pipeline=..., pipeline_space=...)`][scalefm.api.acquire]:
+To operate, ScaleFM requires at minimum the following three arguments
+[`scalefm.acquire(evaluate_pipeline=..., pipeline_space=..., total_cost_to_spend=...)`][scalefm.api.acquire],
+or, for [asynchronous evaluation](evaluate_pipeline.md#3-asynchronous-evaluation-advanced),
+`scalefm.acquire(is_async=True, pipeline_space=..., total_cost_to_spend=...)`:
 
 ```python
 import scalefm
@@ -26,7 +28,8 @@ class ExamplePipeline(scalefm.PipelineSpace):
 scalefm.acquire(
     evaluate_pipeline=evaluate_pipeline, # (1)!
     pipeline_space=ExamplePipeline(), # (2)!
-    root_directory="path/to/result_dir" # (3)!
+    total_cost_to_spend=1e18, # (3)!
+    root_directory="path/to/result_dir" # (4)!
 )
 ```
 
@@ -35,7 +38,10 @@ scalefm.acquire(
 2.  This defines the search space for the configurations from which the optimizer samples.
     It accepts a class instance inheriting from `scalefm.PipelineSpace` or a [`configSpace.ConfigurationSpace`](https://automl.github.io/ConfigSpace/) object.
     For comprehensive information and examples, please refer to the detailed guide available [here](../reference/scalefm_spaces.md)
-3.  The directory path where the information about the optimization and its progress gets stored.
+3.  The cost budget of the whole study, across all workers, in the unit of the `cost` that
+    `evaluate_pipeline` returns, e.g. FLOPs. No new evaluation starts once it is spent.
+    See [Budget, how long to run?](#budget-how-long-to-run).
+4.  The directory path where the information about the optimization and its progress gets stored.
     This is also used to synchronize multiple calls to `scalefm.acquire()` for parallelization.
 
 

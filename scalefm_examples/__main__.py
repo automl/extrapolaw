@@ -24,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--print",
         default=None,
-        help="Example name to print in form of 'basic_usage.1_hyperparameters'",
+        help="Example name to print in form of 'convenience.logging_additional_info'",
     )
     args = parser.parse_args()
 

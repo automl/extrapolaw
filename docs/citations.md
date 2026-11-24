@@ -7,7 +7,7 @@ For citing ScaleFM, please refer to the following:
 ### APA Style
 
 ```apa
- Alipour, N., Ambattu, P., Hog, J. Hutter, F. & Stoll, D. (2026). ScaleFM (Version 0.1.0) [Computer software]. https://github.com/automl/scalefm
+ Alipour, N., Ambattu, P., Hog, J., Hutter, F. & Stoll, D. (2026). ScaleFM (Version 0.1.0) [Computer software]. https://github.com/automl/scalefm
 ```
 
 ### BibTex Style

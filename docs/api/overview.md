@@ -1,7 +1,7 @@
 
 This content tree contains the core components and utilities of ScaleFM, designed to simplify and enhance the process of running optimization experiments. Below is an overview of the files and their purposes:
 
-- [`scalefm.acquire`](scalefm/api.md): Provides the built-in ScaleFM runtime to **sample new trials** and **evaluate them automatically**.
+- [`scalefm.acquire`](scalefm/api.md): Provides the built-in ScaleFM runtime to **sample new trials** and optionally **evaluate them automatically**.
 - [`scalefm.runtime`](scalefm/runtime.md): Implements the `Worker`, offering functions to create a worker, sample new trials, and evaluate them.
 - `scalefm.optimizers`:
     - [`scalefm.algorithms`](scalefm/optimizers/algorithms.md): Contains a collection of optimization algorithms, such as random search, grid search, bayesian optimization, CARBS and Chinchilla, for sampling new trials.

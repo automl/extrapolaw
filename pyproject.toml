@@ -285,7 +285,6 @@ max-args = 10 # Changed from default of 5
 addopts = "-m 'not ci_examples'"
 markers = [
     "ci_examples",
-    "core_examples",
     "runtime",
     "summary_csv",
 ]
