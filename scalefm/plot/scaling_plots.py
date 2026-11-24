@@ -209,6 +209,10 @@ def predict_over(
         else:
             for name in names:
                 predicted[name] = [p.config[name] for p in predictions]  # type: ignore[index]
+                predicted[f"{name}_fit"] = [
+                    p.info[target]["fitted_config"][name]  # type: ignore[index]
+                    for p in predictions
+                ]
     return predicted
 
 
@@ -228,11 +232,10 @@ def _draw_fit(
     inside = line[line[cost] <= largest_run]
     beyond = line[line[cost] >= inside[cost].max()]
     targets = fit[fit["target"]]
-    ax.plot(inside[cost], inside[column], color=INK, linewidth=2, label=label)
+    y = f"{column}_fit" if f"{column}_fit" in fit else column
+    ax.plot(inside[cost], inside[y], color=INK, linewidth=2, label=label)
     if len(beyond) > 1:
-        ax.plot(
-            beyond[cost], beyond[column], color=INK, linewidth=2, linestyle=(0, (4, 3))
-        )
+        ax.plot(beyond[cost], beyond[y], color=INK, linewidth=2, linestyle=(0, (4, 3)))
     ax.scatter(
         targets[cost],
         targets[column],
@@ -355,7 +358,8 @@ def _pareto(
 
 def _predictions(fit: pd.DataFrame, metric: str, cost: str) -> pd.DataFrame:
     """What the fit predicts at the target costs."""
-    table = fit[fit["target"]].drop(columns="target")
+    fitted = [column for column in fit if column.endswith("_fit")]
+    table = fit[fit["target"]].drop(columns=["target", *fitted])
     table[metric] = _own_units(metric, table[metric])
     return table.rename(columns={cost: f"target_{cost}", metric: _name(metric)})
 
