@@ -476,8 +476,8 @@ def _plain_log_labels(ax: Axes) -> None:
 def _style(ax: Axes, title: str, xlabel: str, ylabel: str) -> None:
     """Light axes and grid, so the data stands out."""
     ax.set_title(title, loc="left", color=INK, fontsize=12, pad=10)
-    ax.set_xlabel(xlabel, color=SECONDARY_INK)
-    ax.set_ylabel(ylabel, color=SECONDARY_INK)
+    ax.set_xlabel(f"{xlabel} (log)", color=SECONDARY_INK)
+    ax.set_ylabel(f"{ylabel} (log)", color=SECONDARY_INK)
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color(AXIS_COLOR)
     ax.tick_params(which="both", color=AXIS_COLOR, labelcolor=SECONDARY_INK)

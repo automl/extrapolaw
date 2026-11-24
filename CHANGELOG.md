@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Workers started together on a new `root_directory` no longer crash with `EOFError` reading a half-written `optimizer_state.pkl`: the state files are replaced whole, and `optimizer_info.yaml` is written last.
 - Grid search and `chinchilla` runs stop normally once every configuration was evaluated, instead of failing with `WorkerFailedToGetPendingTrialsError`.
+- Parameter plots draw the power-law fit as a straight line instead of steps.
+
 
 ### Removed
 - **BREAKING:** The HPO optimizers that scaling studies do not use: `successive_halving`, `hyperband`, `mo_hyperband`, `asha`, `moasha`, `async_hb`, `priorband`, `ifbo`, `pibo`, `primo`, `scalefm_hyperband`, `scalefm_priorband`, `scalefm_regularized_evolution` and `scalefm_local_and_incumbent`. `bayesian_optimization`, `random_search`, `grid_search`, `complex_random_search`, `scalefm_random_search`, `carbs` and `chinchilla` remain.
