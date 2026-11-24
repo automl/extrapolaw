@@ -14,7 +14,7 @@
 
 # # ScAn: Bayesian Optimization Aimed at the Target Compute
 #
-# The [Extrapolaw demo](extrapolaw_demo.ipynb) acquired runs with Chinchilla's
+# The [ScaleFM demo](scalefm_demo.ipynb) acquired runs with Chinchilla's
 # approach 1 and random search, and extrapolated them to a target compute. **ScAn**
 # spends the same budget more deliberately: it tunes the model size and data together
 # with the other training hyperparameters, and picks the runs that tell it most about
@@ -29,9 +29,9 @@
 # Requires Python 3.11+. In Colab, run the cell below; locally, see the
 # [README](README.md).
 
-# !git clone --depth 1 https://github.com/automl/extrapolaw.git /content/extrapolaw
-# %cd /content/extrapolaw/tutorials
-# !pip install -e "/content/extrapolaw[carbs]"
+# !git clone --depth 1 https://github.com/automl/scalefm.git /content/scalefm
+# %cd /content/scalefm/tutorials
+# !pip install -e "/content/scalefm[carbs]"
 # Surrogate benchmark of TabPFN, it makes every run take a fraction of a second
 # !pip install scan-bench
 
@@ -48,11 +48,11 @@ from pathlib import Path
 from IPython.display import Image, display
 from scan_bench import TabPFNTarget
 
-import extrapolaw
+import scalefm
 import tabpfn_scan_bench as tabpfn
 
 logging.basicConfig(level=logging.WARNING)
-logging.getLogger("extrapolaw").setLevel(logging.INFO)
+logging.getLogger("scalefm").setLevel(logging.INFO)
 warnings.filterwarnings("ignore")
 
 
@@ -66,7 +66,7 @@ def show(*images, width=480):
 
 # ## The pipeline
 #
-# `evaluate_pipeline` is the function `extrapolaw.acquire` calls with every config. It
+# `evaluate_pipeline` is the function `scalefm.acquire` calls with every config. It
 # trains a model and returns what the scaling analysis needs: the loss to minimize, the
 # training cost, the model size and data, and optionally downstream performances and
 # the inference cost.
@@ -109,14 +109,14 @@ def evaluate_pipeline(**config) -> dict:
 # The model size is determined by `embedding_size` and `num_layers`, the amount of data by
 # `total_cells`.
 
-class TabPFNSpace(extrapolaw.PipelineSpace):
+class TabPFNSpace(scalefm.PipelineSpace):
     # Compute-scaling parameters: the model size and the data
-    total_cells = extrapolaw.Integer(2**20, 2**35, log=True, log_base=2, is_compute_scaling=True)
-    embedding_size = extrapolaw.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
-    num_layers = extrapolaw.Integer(2, 32, log=True, log_base=2, is_compute_scaling=True)
+    total_cells = scalefm.Integer(2**20, 2**35, log=True, log_base=2, is_compute_scaling=True)
+    embedding_size = scalefm.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
+    num_layers = scalefm.Integer(2, 32, log=True, log_base=2, is_compute_scaling=True)
     # The other hyperparameters
-    effective_batch_size = extrapolaw.Integer(16, 256, log=True, log_base=2)
-    lr = extrapolaw.Float(1e-4, 5e-2, log=True)
+    effective_batch_size = scalefm.Integer(16, 256, log=True, log_base=2)
+    lr = scalefm.Float(1e-4, 5e-2, log=True)
 
 
 # Every acquisition gets the same FLOP budget, at most a tenth of it per run, and we
@@ -153,7 +153,7 @@ SCAN_OPTIMIZER = (
 )
 
 tabpfn.set_seed(0)
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=evaluate_pipeline,
     pipeline_space=TabPFNSpace(),
     root_directory=SCAN,
@@ -164,7 +164,7 @@ extrapolaw.acquire(
     overwrite_root_directory=True,
 )
 
-full, _ = extrapolaw.status(SCAN)
+full, _ = scalefm.status(SCAN)
 print(f"{len(full)} runs, {full['cost'].sum():.2e} FLOPs,"
       f" best loss {full['objective_to_minimize'].min():.3f}")
 # -
@@ -175,7 +175,7 @@ print(f"{len(full)} runs, {full['cost'].sum():.2e} FLOPs,"
 # Gaussian process the optimizer used to all the runs. It needs the estimators to turn
 # a predicted config into its model size and cost:
 
-(prediction,) = extrapolaw.predict(
+(prediction,) = scalefm.predict(
     SCAN, target_costs=TARGETS,
     params_estimator=tabpfn.parameters_estimator, cost_estimator=tabpfn.flops_estimator,
     cache_dir=SCAN / "gp_cache",
@@ -208,9 +208,9 @@ print((SCAN / "summary/pre_train/predictions_over_cost.txt").read_text())
 RECIPE = dict(num_layers=2, effective_batch_size=64, lr=1e-3)
 
 
-class TabPFNChinchillaSpace(extrapolaw.PipelineSpace):
-    total_cells = extrapolaw.Integer(2**20, 2**35, log=True, log_base=2, is_compute_scaling=True)
-    embedding_size = extrapolaw.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
+class TabPFNChinchillaSpace(scalefm.PipelineSpace):
+    total_cells = scalefm.Integer(2**20, 2**35, log=True, log_base=2, is_compute_scaling=True)
+    embedding_size = scalefm.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
     # The fixed recipe
     num_layers = RECIPE["num_layers"]
     effective_batch_size = RECIPE["effective_batch_size"]
@@ -220,7 +220,7 @@ class TabPFNChinchillaSpace(extrapolaw.PipelineSpace):
 CHINCHILLA1 = RESULTS / "chinchilla1"
 
 tabpfn.set_seed(0)
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=evaluate_pipeline,
     pipeline_space=TabPFNChinchillaSpace(),
     root_directory=CHINCHILLA1,
@@ -238,8 +238,8 @@ extrapolaw.acquire(
     overwrite_root_directory=True,
 )
 
-(chinchilla_loss,) = extrapolaw.predict(CHINCHILLA1, target_costs=TARGETS)
-(chinchilla_full,) = extrapolaw.predict(CHINCHILLA1, target_costs=TARGETS, predictor="power_law")
+(chinchilla_loss,) = scalefm.predict(CHINCHILLA1, target_costs=TARGETS)
+(chinchilla_full,) = scalefm.predict(CHINCHILLA1, target_costs=TARGETS, predictor="power_law")
 print(f"C={TARGET:.1e}: loss {chinchilla_loss.loss:.3f}")
 print("config:", chinchilla_full.config)
 # -

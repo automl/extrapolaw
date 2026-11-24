@@ -6,37 +6,37 @@ For a scaling study, the [scaling optimizers](#3-scaling-optimizers) build the s
 
 Fidelity parameters and priors in the search space are optional, see [fidelities](../reference/search_algorithms/landing_page_algo.md#fidelities) and [priors](../reference/search_algorithms/landing_page_algo.md#priors) for the optimizers that use them.
 
-## 2 Extrapolaw Optimizer Selection
+## 2 ScaleFM Optimizer Selection
 
 ### 2.1 Automatic Optimizer Selection
 
-The [algorithms](../reference/search_algorithms/landing_page_algo.md) section goes into detail on each optimizer. This chapter focusses on how to select them when using Extrapolaw.
+The [algorithms](../reference/search_algorithms/landing_page_algo.md) section goes into detail on each optimizer. This chapter focusses on how to select them when using ScaleFM.
 
 ✅ = supported/necessary, ❌ = not supported, ✔️* = optional, click for details, ✖️\* ignorable, click for details
 
-| Algorithm         | [Fidelity](../reference/search_algorithms/landing_page_algo.md#fidelities) | [Priors](../reference/search_algorithms/landing_page_algo.md#priors) | Model-based | [Extrapolaw-ready](../reference/extrapolaw_spaces.md#3-constructing-architecture-spaces) |
+| Algorithm         | [Fidelity](../reference/search_algorithms/landing_page_algo.md#fidelities) | [Priors](../reference/search_algorithms/landing_page_algo.md#priors) | Model-based | [ScaleFM-ready](../reference/scalefm_spaces.md#3-constructing-architecture-spaces) |
 | :- | :------------: | :----: | :---------: | :-----------------: |
-| `Grid Search`|[️️✖️*][extrapolaw.optimizers.algorithms.grid_search]|❌|❌|✅|
-| `Random Search`|[️️✖️*][extrapolaw.optimizers.algorithms.random_search]|[✔️*][extrapolaw.optimizers.algorithms.random_search]|❌|✅|
-| `Complex Random Search`|[️️✖️*][extrapolaw.optimizers.algorithms.complex_random_search]|❌|❌|✅|
-| [`Bayesian Optimization`](../reference/search_algorithms/bayesian_optimization.md)|[️️✖️*][extrapolaw.optimizers.algorithms.bayesian_optimization]|❌|✅|❌|
-| [`CARBS`](#31-carbs)|❌|[✔️*][extrapolaw.optimizers.algorithms.carbs]|✅|❌|
+| `Grid Search`|[️️✖️*][scalefm.optimizers.algorithms.grid_search]|❌|❌|✅|
+| `Random Search`|[️️✖️*][scalefm.optimizers.algorithms.random_search]|[✔️*][scalefm.optimizers.algorithms.random_search]|❌|✅|
+| `Complex Random Search`|[️️✖️*][scalefm.optimizers.algorithms.complex_random_search]|❌|❌|✅|
+| [`Bayesian Optimization`](../reference/search_algorithms/bayesian_optimization.md)|[️️✖️*][scalefm.optimizers.algorithms.bayesian_optimization]|❌|✅|❌|
+| [`CARBS`](#31-carbs)|❌|[✔️*][scalefm.optimizers.algorithms.carbs]|✅|❌|
 | [`Chinchilla`](#32-chinchilla-guided-scaling)|❌|❌|❌|❌|
 
-Without an `optimizer`, `extrapolaw.acquire()` uses [`random_search`][extrapolaw.optimizers.algorithms.random_search].
-Pass `"auto"` instead to let Extrapolaw choose the optimizer based on your search space
+Without an `optimizer`, `scalefm.acquire()` uses [`random_search`][scalefm.optimizers.algorithms.random_search].
+Pass `"auto"` instead to let ScaleFM choose the optimizer based on your search space
 (or, when continuing a run, to reuse the optimizer it was started with):
 
 - If it has neither a fidelity nor a prior: [`bayesian_optimization`](../reference/search_algorithms/bayesian_optimization.md)
-- Otherwise: [`random_search`][extrapolaw.optimizers.algorithms.random_search], sampling around the priors, if there are any
-- If it cannot be converted to a classic search space, e.g. because it has an `Operation`: [`complex_random_search`][extrapolaw.optimizers.algorithms.complex_random_search]
+- Otherwise: [`random_search`][scalefm.optimizers.algorithms.random_search], sampling around the priors, if there are any
+- If it cannot be converted to a classic search space, e.g. because it has an `Operation`: [`complex_random_search`][scalefm.optimizers.algorithms.complex_random_search]
 
 A fidelity is always set to its maximum.
 
 For example, the following chooses an optimizer depending on the `pipeline_space` passed.
 
 ```python
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -45,19 +45,19 @@ extrapolaw.acquire(
 )
 ```
 
-### 2.2 Choosing one of Extrapolaw Optimizers
+### 2.2 Choosing one of ScaleFM Optimizers
 
-The available optimizers are imported via the `extrapolaw.algorithms` module.
+The available optimizers are imported via the `scalefm.algorithms` module.
 You can use either the optimizer name or the optimizer class itself as the optimizer argument.
 
 ```python
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
     total_evaluations_to_spend=25,
     # optimizer specified, along with an argument
-    optimizer=extrapolaw.algorithms.bayesian_optimization, # or as string: "bayesian_optimization"
+    optimizer=scalefm.algorithms.bayesian_optimization, # or as string: "bayesian_optimization"
 )
 ```
 
@@ -65,14 +65,14 @@ For a list of available optimizers, please refer [here](./search_algorithms/land
 
 !!! tip "Interactive tutorial"
 
-    The [Extrapolaw demo](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb) shows the basic pipeline end to end, with Chinchilla approach 1 and the default random search.
+    The [ScaleFM demo](https://colab.research.google.com/github/automl/scalefm/blob/master/tutorials/scalefm_demo.ipynb) shows the basic pipeline end to end, with Chinchilla approach 1 and the default random search.
 
 ### 2.3 Hyperparameter Overrides
 
 For users who want more control over the optimizer's hyperparameters, you can input a dictionary with your parameter choices together with the optimizer name.
 
 ```python
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -83,13 +83,13 @@ extrapolaw.acquire(
 
 ### 2.4 Loading Optimizer Information
 
-Extrapolaw automatically saves the optimizer metadata (name and configuration) when you run an optimization. You can retrieve this information later using `extrapolaw.load_optimizer_info()`:
+ScaleFM automatically saves the optimizer metadata (name and configuration) when you run an optimization. You can retrieve this information later using `scalefm.load_optimizer_info()`:
 
 ```python
-import extrapolaw
+import scalefm
 
 # Load the optimizer info from a previous run
-optimizer_info = extrapolaw.load_optimizer_info("path/to/extrapolaw_folder")
+optimizer_info = scalefm.load_optimizer_info("path/to/scalefm_folder")
 
 # Access the optimizer name and configuration
 print(f"Optimizer: {optimizer_info['name']}")
@@ -104,7 +104,7 @@ This is useful for:
 
 !!! tip "Reconstructing a Complete Run"
 
-    Combine `load_optimizer_info()` with `load_pipeline_space()` to fully reconstruct a previous optimization. See [Reconstructing and Reproducing Runs](extrapolaw_acquire.md#reconstructing-and-reproducing-runs) for a complete example.
+    Combine `load_optimizer_info()` with `load_pipeline_space()` to fully reconstruct a previous optimization. See [Reconstructing and Reproducing Runs](scalefm_acquire.md#reconstructing-and-reproducing-runs) for a complete example.
 
 ## 3 Scaling Optimizers
 
@@ -113,8 +113,8 @@ one good configuration for a fixed setting, they spend a search budget `C_search
 cheaper configurations and learn how the best configuration changes with cost. From this
 they predict the best configuration for a larger target cost.
 
-They draw on three arguments of `extrapolaw.acquire()`, see
-[estimating the cost of a configuration](extrapolaw_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration):
+They draw on three arguments of `scalefm.acquire()`, see
+[estimating the cost of a configuration](scalefm_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration):
 
 - `cost_estimator`: the cost of a configuration, e.g. its FLOPs, known before it is
   evaluated. It is computed from the parameters marked with `is_compute_scaling=True`.
@@ -123,8 +123,8 @@ They draw on three arguments of `extrapolaw.acquire()`, see
 
 | Optimizer | Approach | Supports | Install |
 | :- | :- | :- | :- |
-| [`carbs`][extrapolaw.optimizers.algorithms.carbs] | Cost-aware BO along the pareto front of objective and cost | `Integer` and `Float` parameters, no fidelities | `pip install extrapolaw[carbs]` |
-| [`chinchilla`][extrapolaw.optimizers.algorithms.chinchilla] | Splits compute between model size and data on ISO-FLOP levels | Needs `cost_estimator` and `total_cost_to_spend`, no fidelities | Included |
+| [`carbs`][scalefm.optimizers.algorithms.carbs] | Cost-aware BO along the pareto front of objective and cost | `Integer` and `Float` parameters, no fidelities | `pip install scalefm[carbs]` |
+| [`chinchilla`][scalefm.optimizers.algorithms.chinchilla] | Splits compute between model size and data on ISO-FLOP levels | Needs `cost_estimator` and `total_cost_to_spend`, no fidelities | Included |
 
 ### 3.1 CARBS
 
@@ -135,7 +135,7 @@ of every evaluation. That is either the `cost` returned by `evaluate_pipeline` o
 estimate of the `cost_estimator`:
 
 ```python
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -150,14 +150,14 @@ If the center of the space is too expensive to start from, set
 e.g. the size of the dataset, is halved until the search center costs at most that
 fraction of `max_cost_per_config`.
 
-CARBS wraps an external library, so it is not installed with Extrapolaw. Install it with
-`pip install extrapolaw[carbs]`. It does not keep any files of its own. Its state is
+CARBS wraps an external library, so it is not installed with ScaleFM. Install it with
+`pip install scalefm[carbs]`. It does not keep any files of its own. Its state is
 rebuilt from the trials in the `root_directory` whenever a configuration is sampled, so
 runs can be continued and parallelized like with any other optimizer.
 
 ### 3.2 Chinchilla Guided Scaling
 
-[`chinchilla`][extrapolaw.optimizers.algorithms.chinchilla] follows
+[`chinchilla`][scalefm.optimizers.algorithms.chinchilla] follows
 [Training Compute-Optimal Large Language Models](https://arxiv.org/abs/2203.15556). It
 lays out a static list of configurations that grow the model and the amount of data together,
 to find how a compute budget should be split between the two. The parameters marked
@@ -168,7 +168,7 @@ fixed.
 def estimate_params(width: int, layers: int) -> float:
     return ...
 
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -183,7 +183,7 @@ extrapolaw.acquire(
 ```
 
 1.  Required, see the
-    [`cost_estimator`](extrapolaw_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration).
+    [`cost_estimator`](scalefm_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration).
 2.  Optional. No configuration estimated to cost more than this is laid out.
 3.  Required, the configurations are laid out to fit into this budget.
     `worker_cost_to_spend` is used if it is not given.
@@ -205,7 +205,7 @@ scaling of parameters and data with the compute is written to the `summary` fold
 
 ## 4 Custom Optimizers
 
-To design entirely new optimizers, you can define them as class with a `__call__` method outside of Extrapolaw and pass them to the `extrapolaw.acquire()` function:
+To design entirely new optimizers, you can define them as class with a `__call__` method outside of ScaleFM and pass them to the `scalefm.acquire()` function:
 
 ```python
 @dataclass
@@ -224,10 +224,10 @@ class MyOptimizer:
         ...
 ```
 
-The class is then passed to the `extrapolaw.acquire()` function just like the built-in optimizers and can be configured the same way, using a dictionary:
+The class is then passed to the `scalefm.acquire()` function just like the built-in optimizers and can be configured the same way, using a dictionary:
 
 ```python
-extrapolaw.acquire(
+scalefm.acquire(
     evaluate_pipeline=run_function,
     pipeline_space=pipeline_space,
     root_directory="results/",
@@ -236,9 +236,9 @@ extrapolaw.acquire(
 )
 ```
 
-For more details on how to define a custom optimizer see the [Optimizer Interface][extrapolaw.optimizers.optimizer.AskFunction].
+For more details on how to define a custom optimizer see the [Optimizer Interface][scalefm.optimizers.optimizer.AskFunction].
 
-To receive the `cost_estimator` and `max_cost_per_config` given to `extrapolaw.acquire()`, like the [scaling optimizers](#3-scaling-optimizers), inherit from [`ScalingOptimizer`][extrapolaw.optimizers.optimizer.ScalingOptimizer]:
+To receive the `cost_estimator` and `max_cost_per_config` given to `scalefm.acquire()`, like the [scaling optimizers](#3-scaling-optimizers), inherit from [`ScalingOptimizer`][scalefm.optimizers.optimizer.ScalingOptimizer]:
 
 ```python
 class MyOptimizer(ScalingOptimizer):

@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import extrapolaw
-from extrapolaw.prediction import (
+import scalefm
+from scalefm.prediction import (
     PredictorTypes,
     Row,
     ScalingLawParameters,
@@ -16,8 +16,8 @@ from extrapolaw.prediction import (
     gp,
     power_law,
 )
-from extrapolaw.prediction.scaling_law_fit import fit_power_law, predict_from_loglog_fit
-from extrapolaw.space import HPOFloat, HPOInteger, SearchSpace
+from scalefm.prediction.scaling_law_fit import fit_power_law, predict_from_loglog_fit
+from scalefm.space import HPOFloat, HPOInteger, SearchSpace
 
 TRUE_LAW = ScalingLawParameters(E=1.69, A=406.4, B=410.7, alpha=0.34, beta=0.28)
 
@@ -203,7 +203,7 @@ def _import_run(root: Path, n: int = 60, *, report_scale: bool = False) -> None:
     """A run of the synthetic law, whose reports have `n_params` and `n_data` with
     `report_scale`.
     """
-    extrapolaw.import_trials(
+    scalefm.import_trials(
         [
             (
                 {"n_params": r[0], "n_data": r[1]},
@@ -223,7 +223,7 @@ def test_predict_from_a_run(tmp_path: Path) -> None:
     _import_run(root)
 
     # "auto" is the power law. Without a model size, COARSE is left out
-    (power,) = extrapolaw.predict(root, 1e21)
+    (power,) = scalefm.predict(root, 1e21)
     assert power.loss is not None
     assert power.loss_interval is not None
     assert power.config is not None
@@ -232,30 +232,30 @@ def test_predict_from_a_run(tmp_path: Path) -> None:
 
     # Chinchilla's law, and the COARSE power law, are fitted on the reported scale
     with pytest.raises(ValueError, match="no `n_params` or `n_data`"):
-        extrapolaw.predict(root, 1e21, predictor="chinchilla3")
+        scalefm.predict(root, 1e21, predictor="chinchilla3")
     with pytest.raises(ValueError, match="no `n_params` or `n_data`"):
-        extrapolaw.predict(root, 1e21, targets=[Target.COARSE])
+        scalefm.predict(root, 1e21, targets=[Target.COARSE])
 
     scaled = tmp_path / "scaled"
     _import_run(scaled, report_scale=True)
-    (power,) = extrapolaw.predict(scaled, 1e21)
+    (power,) = scalefm.predict(scaled, 1e21)
     assert power.n_params is not None
-    predictions = extrapolaw.predict(scaled, [1e20, 1e21], predictor="chinchilla3")
+    predictions = scalefm.predict(scaled, [1e20, 1e21], predictor="chinchilla3")
     assert [p.target_cost for p in predictions] == [1e20, 1e21]
     n_params, _n_data, _loss = chinchilla3.optimum(TRUE_LAW, 1e21)
     assert predictions[1].n_params == pytest.approx(n_params, rel=0.05)
 
     with pytest.raises(ValueError, match="does not predict"):
-        extrapolaw.predict(scaled, 1e21, predictor="chinchilla3", targets=[Target.FULL])
+        scalefm.predict(scaled, 1e21, predictor="chinchilla3", targets=[Target.FULL])
     with pytest.raises(ValueError, match="Unknown predictor"):
-        extrapolaw.predict(root, 1e21, predictor="nope")
+        scalefm.predict(root, 1e21, predictor="nope")
 
 
 def test_predict_gp_posterior_from_a_run(tmp_path: Path) -> None:
     root = tmp_path / "run"
     _import_run(root, n=15)
 
-    (prediction,) = extrapolaw.predict(
+    (prediction,) = scalefm.predict(
         root,
         1e17,
         predictor="gp_posterior",
@@ -291,7 +291,7 @@ def test_gp_posterior_checkpoint_only_loads_with_the_same_log_y(
 def test_gp_posterior_with_the_zero_prior_mean_of_the_optimizer(tmp_path: Path) -> None:
     from gpytorch.means import ZeroMean
 
-    from extrapolaw.optimizers.models.gp import PowerLawMean
+    from scalefm.optimizers.models.gp import PowerLawMean
 
     rows = _synthetic(n=12)
     kwargs = {

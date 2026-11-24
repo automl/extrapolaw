@@ -27,7 +27,7 @@ site/*
 
 # Results
 results
-extrapolaw_examples/results
+scalefm_examples/results
 tests_tmpdir
 usage_example
 lightning_logs

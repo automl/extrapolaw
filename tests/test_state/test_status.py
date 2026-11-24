@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import extrapolaw
+import scalefm
 
 
-class Space(extrapolaw.PipelineSpace):
-    x = extrapolaw.Float(0.0, 1.0)
+class Space(scalefm.PipelineSpace):
+    x = scalefm.Float(0.0, 1.0)
 
 
 def _evaluate(x: float) -> dict:
@@ -13,7 +13,7 @@ def _evaluate(x: float) -> dict:
 
 def test_status_reads_the_given_run_after_acquiring_another(tmp_path) -> None:
     for name, evaluations in [("first", 2), ("second", 3)]:
-        extrapolaw.acquire(
+        scalefm.acquire(
             evaluate_pipeline=_evaluate,
             pipeline_space=Space(),
             root_directory=tmp_path / name,
@@ -22,5 +22,5 @@ def test_status_reads_the_given_run_after_acquiring_another(tmp_path) -> None:
         )
 
     # The process ran `acquire` on "second" last, "first" is still summarized itself
-    assert len(extrapolaw.status(tmp_path / "first")[0]) == 2
-    assert len(extrapolaw.status(tmp_path / "second")[0]) == 3
+    assert len(scalefm.status(tmp_path / "first")[0]) == 2
+    assert len(scalefm.status(tmp_path / "second")[0]) == 3

@@ -1,9 +1,9 @@
-# Extrapolaw Tutorial
+# ScaleFM Tutorial
 
-The **Extrapolaw Demo** is a basic demo of Extrapolaw: the basic pipeline,
+The **ScaleFM Demo** is a basic demo of ScaleFM: the basic pipeline,
 visualization, and parallelisation of the runs. It runs on a CPU in about 5 minutes.
 
-[Local](extrapolaw_demo.py) · [Colab](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb)
+[Local](scalefm_demo.py) · [Colab](https://colab.research.google.com/github/automl/scalefm/blob/master/tutorials/scalefm_demo.ipynb)
 
 `tabpfn_scan_bench.py` holds the pieces of the TabPFN benchmark the notebook builds
 its `evaluate_pipeline` from: the surrogates of [`scan_bench`](https://pypi.org/project/scan-bench/)
@@ -26,24 +26,24 @@ pip install -r tutorials/requirements.txt
 
 Run the tutorial as a script:
 ```bash
-python tutorials/extrapolaw_demo.py
+python tutorials/scalefm_demo.py
 ```
 
 Or use Jupyter, started in `tutorials/` so that `tabpfn_scan_bench` can be imported:
 ```bash
 pip install jupyter
-cd tutorials && jupyter notebook extrapolaw_demo.ipynb
+cd tutorials && jupyter notebook scalefm_demo.ipynb
 ```
 
-`extrapolaw_demo.py` is the [jupytext](https://jupytext.readthedocs.io) source of the
+`scalefm_demo.py` is the [jupytext](https://jupytext.readthedocs.io) source of the
 notebook. After editing it, regenerate the notebook:
 ```bash
-jupytext --to notebook tutorials/extrapolaw_demo.py --output tutorials/extrapolaw_demo.ipynb --update
+jupytext --to notebook tutorials/scalefm_demo.py --output tutorials/scalefm_demo.ipynb --update
 ```
 
 ## Resources
 
-- [Documentation](https://automl.github.io/extrapolaw/latest/)
-- [GitHub Repository](https://github.com/automl/extrapolaw)
-- [API Reference](https://automl.github.io/extrapolaw/latest/api/extrapolaw/api/)
-- [More Examples](https://github.com/automl/extrapolaw/tree/master/extrapolaw_examples)
+- [Documentation](https://automl.github.io/scalefm/latest/)
+- [GitHub Repository](https://github.com/automl/scalefm)
+- [API Reference](https://automl.github.io/scalefm/latest/api/scalefm/api/)
+- [More Examples](https://github.com/automl/scalefm/tree/master/scalefm_examples)

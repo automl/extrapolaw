@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from extrapolaw.state.pipeline_eval import EvaluatePipelineReturn, UserResult
+from scalefm.state.pipeline_eval import EvaluatePipelineReturn, UserResult
 
 
 def d(obj: Any = None, cost: Any = None, lc: Any = None) -> dict:

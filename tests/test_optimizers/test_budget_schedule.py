@@ -9,18 +9,18 @@ import torch
 from botorch.models import SingleTaskGP
 from gpytorch.means import ZeroMean
 
-from extrapolaw.exceptions import BudgetExhaustedError
-from extrapolaw.optimizers import bayesian_optimization as bo_module
-from extrapolaw.optimizers.acquisition import information_theoretic
-from extrapolaw.optimizers.acquisition.information_theoretic import (
+from scalefm.exceptions import BudgetExhaustedError
+from scalefm.optimizers import bayesian_optimization as bo_module
+from scalefm.optimizers.acquisition import information_theoretic
+from scalefm.optimizers.acquisition.information_theoretic import (
     CostWeightedModifiedJES,
 )
-from extrapolaw.optimizers.algorithms import bayesian_optimization
-from extrapolaw.optimizers.models.gp import LogCost, PowerLawMean
-from extrapolaw.optimizers.optimizer import SampledConfig
-from extrapolaw.space import HPOFloat, HPOInteger, SearchSpace
-from extrapolaw.space.encoding import ConfigEncoder
-from extrapolaw.state import BudgetInfo, Trial
+from scalefm.optimizers.algorithms import bayesian_optimization
+from scalefm.optimizers.models.gp import LogCost, PowerLawMean
+from scalefm.optimizers.optimizer import SampledConfig
+from scalefm.space import HPOFloat, HPOInteger, SearchSpace
+from scalefm.space.encoding import ConfigEncoder
+from scalefm.state import BudgetInfo, Trial
 
 
 def _space(lower: int = 1, upper: int = 1000) -> SearchSpace:
@@ -343,12 +343,12 @@ def test_prior_mean_keeps_the_schedule(
     ("acquisition", "predictor"), [("EI", "power_law"), ("IT-SCAN-JES", "gp_posterior")]
 )
 def test_scan_predicts_with_its_gp(acquisition: str, predictor: str) -> None:
-    from extrapolaw.optimizers import _make_info
+    from scalefm.optimizers import _make_info
 
     optimizer = bayesian_optimization(
         _space(), acquisition_func_type=acquisition, target_cost=10**6
     )
     assert optimizer.predictor == predictor
-    # `extrapolaw.predict(predictor="auto")` reads it from the saved optimizer info
+    # `scalefm.predict(predictor="auto")` reads it from the saved optimizer info
     info = _make_info("bayesian_optimization", {}, optimizer)
     assert info["derived"]["predictor"] == predictor

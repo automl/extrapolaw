@@ -11,7 +11,7 @@ authors:
     given-names: Frank
   - family-names: Stoll
     given-names: Danny
-title: "Extrapolaw"
+title: "ScaleFM"
 version: 0.1.0
 date-released: 2026-11-23
-url: "https://github.com/automl/extrapolaw"
+url: "https://github.com/automl/scalefm"
