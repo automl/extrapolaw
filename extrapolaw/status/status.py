@@ -213,11 +213,15 @@ class Summary:
         root_directory = Path(root_directory)
         # NOTE: We don't lock the shared state since we are just reading and don't need to
         # make decisions based on the state
-        try:
-            from extrapolaw.runtime import get_workers_extrapolaw_state
+        from extrapolaw.runtime import get_workers_extrapolaw_state
 
+        try:
             shared_state = get_workers_extrapolaw_state()
         except RuntimeError:
+            shared_state = None
+        # The worker's state is reused only for its own run, a process that ran
+        # `acquire` before can still summarize any other run
+        if shared_state is None or shared_state.path != root_directory.resolve():
             shared_state = ExtrapolawState.create_or_load(root_directory, load_only=True)
 
         trials = shared_state.lock_and_read_trials()

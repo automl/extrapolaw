@@ -23,8 +23,9 @@ The [algorithms](../reference/search_algorithms/landing_page_algo.md) section go
 | [`CARBS`](#31-carbs)|❌|[✔️*][extrapolaw.optimizers.algorithms.carbs]|✅|❌|
 | [`Chinchilla`](#32-chinchilla-guided-scaling)|❌|❌|❌|❌|
 
-If you prefer not to specify a particular optimizer for your AutoML task, you can simply pass `"auto"` or `None`
-for the extrapolaw optimizer. Extrapolaw then chooses the optimizer based on your search space:
+Without an `optimizer`, `extrapolaw.acquire()` uses [`random_search`][extrapolaw.optimizers.algorithms.random_search].
+Pass `"auto"` instead to let Extrapolaw choose the optimizer based on your search space
+(or, when continuing a run, to reuse the optimizer it was started with):
 
 - If it has neither a fidelity nor a prior: [`bayesian_optimization`](../reference/search_algorithms/bayesian_optimization.md)
 - Otherwise: [`random_search`][extrapolaw.optimizers.algorithms.random_search], sampling around the priors, if there are any
@@ -32,8 +33,7 @@ for the extrapolaw optimizer. Extrapolaw then chooses the optimizer based on you
 
 A fidelity is always set to its maximum.
 
-For example, running the following format, without specifying a optimizer will choose an optimizer depending on
-the `pipeline_space` passed.
+For example, the following chooses an optimizer depending on the `pipeline_space` passed.
 
 ```python
 extrapolaw.acquire(
@@ -41,7 +41,7 @@ extrapolaw.acquire(
     pipeline_space=pipeline_space,
     root_directory="results/",
     total_evaluations_to_spend=25,
-    # no optimizer specified
+    optimizer="auto",
 )
 ```
 
@@ -62,6 +62,10 @@ extrapolaw.acquire(
 ```
 
 For a list of available optimizers, please refer [here](./search_algorithms/landing_page_algo.md).
+
+!!! tip "Interactive tutorial"
+
+    The [Extrapolaw demo](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb) shows the basic pipeline end to end, with Chinchilla approach 1 and the default random search.
 
 ### 2.3 Hyperparameter Overrides
 

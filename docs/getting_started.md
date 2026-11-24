@@ -56,18 +56,13 @@ The [reference](reference/extrapolaw_acquire.md) section provides detailed infor
 4. How to define the [`evaluate_pipeline()` function](reference/evaluate_pipeline.md).
 5. How to [analyze](reference/analyse.md) the optimization runs.
 
-Discover the features of Extrapolaw through these practical examples:
+!!! tip "Interactive tutorial"
 
-* **[Hyperparameter Optimization (HPO)](examples/basic_usage/1_hyperparameters.md)**:
-Learn the essentials of hyperparameter optimization with Extrapolaw.
+    Or try Extrapolaw hands-on with the [Extrapolaw Demo](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb), a basic demo of the pipeline, the visualization and the parallelisation of the runs.
 
-* **[Scaling Study of TabPFN](examples/real_world/tabpfn_scan_bench.md)**:
-Learn how to run a scaling study under a FLOP budget, and fit and extrapolate its scaling law.
+Or discover the features of Extrapolaw through these practical examples:
 
-* **[Benefiting Extrapolaw State and Optimizers with custom runtime](examples/experimental/ask_and_tell_example.md)**:
-Learn how to use AskAndTell, an advanced tool for leveraging optimizers and states while enabling a custom runtime for trial execution.
-
-- **[Integration with TensorBoard](examples/convenience/extrapolaw_tblogger_tutorial.md)**: Discover how to leverage Extrapolaw's built-in TensorBoard support and seamlessly incorporate your own custom TensorBoard data for enhanced experiment tracking.
-
-* **[Additional Extrapolaw Examples](examples/index.md)**:
-Explore more examples, including various use cases and advanced configurations in Extrapolaw.
+- **[Scaling study of TabPFN](examples/real_world/tabpfn_scan_bench.md):** a random search under a FLOP budget, with the scaling law fitted and extrapolated.
+- **[Asynchronous evaluation](examples/async_evaluation/submit.md):** submit each configuration as a Slurm job and report its result back with `extrapolaw.save_pipeline_results()`.
+- **[Scaling study of an OpenCLIP VLM](https://github.com/automl/extrapolaw/tree/master/extrapolaw_examples/real_world/vlm_openclip):** vision and text towers of varying width and depth, each trained in a Slurm job sized to its GPU memory needs.
+- **[Distributed training](examples/efficiency/index.md):** evaluate configurations with DDP or FSDP, in native PyTorch or PyTorch Lightning.

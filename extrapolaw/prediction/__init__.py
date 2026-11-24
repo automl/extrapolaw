@@ -67,21 +67,14 @@ def get_predictor_type(predictor: str | PredictorTypes) -> PredictorTypes:
 
 def rows_from_trials(
     trials: Iterable[Trial],
-    *,
-    params_estimator: Callable[..., float] | None = None,
-    data_parameter_name: str | None = None,
-    cost_estimator: Callable[..., float] | None = None,
 ) -> tuple[list[Row], list[list[Row]], list[dict[str, Any]]]:
     """The successfully evaluated trials, in the order they were sampled.
 
+    The model size, data and cost of a trial are the `n_params`, `n_data` and `cost`
+    at the top level of its report, NaN when it has none.
+
     Args:
         trials: The trials of a run.
-        params_estimator: Called as `params_estimator(**config)` for `n_params`,
-            `extra["n_param"]` of the report is used without it.
-        data_parameter_name: The parameter holding `n_data`, `extra["n_data"]` of the
-            report is used without it.
-        cost_estimator: Called as `cost_estimator(**config)` for the flops of trials
-            that reported no cost.
 
     Returns:
         `(rows, learning_curve_rows, configs)`: one `(n_params, n_data, loss, flops)`
@@ -102,27 +95,8 @@ def rows_from_trials(
             loss = float("nan")
 
         config = dict(trial.config)
-        extra = report.extra or {}
-        flops = report.cost
-        if flops is None and cost_estimator is not None:
-            flops = cost_estimator(**config)
-        n_params = (
-            params_estimator(**config)
-            if params_estimator is not None
-            else extra.get("n_param")
-        )
-        n_data = (
-            config.get(data_parameter_name)
-            if data_parameter_name is not None
-            else extra.get("n_data")
-        )
-        # The values the run reported come first
-        if report.n_params is not None:
-            n_params = report.n_params
-        if report.n_data is not None:
-            n_data = report.n_data
-        n_params = _nan_float(n_params)
-        rows.append((n_params, _nan_float(n_data), loss, _nan_float(flops)))
+        n_params = _nan_float(report.n_params)
+        rows.append((n_params, _nan_float(report.n_data), loss, _nan_float(report.cost)))
         configs.append(config)
 
         curve = [

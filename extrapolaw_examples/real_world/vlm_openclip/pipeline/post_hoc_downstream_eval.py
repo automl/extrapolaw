@@ -76,12 +76,9 @@ def main(root_dir: Path, n_test: int = 1000):
     for config_dir in pending_configs(root_dir):
         config = yaml.safe_load((config_dir / "config.yaml").read_text())
 
-        model = build_model(
-            config["vision_width"],
-            config["vision_layers"],
-            config["text_width"],
-            config["text_layers"],
-        ).to(DEVICE)
+        # Both towers share the width and depth of the config
+        width, layers = config["width"], config["layers"]
+        model = build_model(width, layers, width, layers).to(DEVICE)
         model.load_state_dict(
             torch.load(config_dir / "checkpoint.pt", map_location=DEVICE)
         )

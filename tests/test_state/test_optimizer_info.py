@@ -140,4 +140,5 @@ def test_auto_resume_of_custom_optimizer_raises_clear_error(tmp_path: Path) -> N
             pipeline_space=_PipelineSpace(),
             root_directory=root,
             worker_evaluations_to_spend=1,
+            optimizer="auto",
         )

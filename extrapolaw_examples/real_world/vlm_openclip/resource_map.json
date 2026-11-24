@@ -1,23 +1,23 @@
 [
   {
     "name": "small",
-    "max_batch_size": 64,
+    "max_n_params": 15000000,
     "partition": "CHANGE_ME__SMALL_PARTITION",
-    "gres": "gpu:1",
+    "gpus": 1,
     "mem": "16G"
   },
   {
     "name": "medium",
-    "max_batch_size": 256,
+    "max_n_params": 50000000,
     "partition": "CHANGE_ME__MEDIUM_PARTITION",
-    "gres": "gpu:1",
+    "gpus": 1,
     "mem": "32G"
   },
   {
     "name": "large",
-    "max_batch_size": null,
+    "max_n_params": null,
     "partition": "CHANGE_ME__LARGE_PARTITION",
-    "gres": "gpu:1",
-    "mem": "64G"
+    "gpus": 4,
+    "mem": "128G"
   }
 ]

@@ -732,8 +732,10 @@ class DefaultWorker:
                     continue
                 raise ValueError(
                     f"The evaluation of trial '{evaluated_trial.id}' returned None."
-                    " Return a result, or set `is_async=True` in `extrapolaw.acquire`"
-                    " if the evaluation reports its result later."
+                    " Return a result, or, to evaluate configs elsewhere, call"
+                    " `extrapolaw.acquire(evaluate_pipeline=None, is_async=True)`, which"
+                    " only samples them, and report each result later with"
+                    " `extrapolaw.save_pipeline_results`."
                 )
 
             logger.info(
@@ -829,8 +831,13 @@ def _save_results(
             else None
         ),
         extra=result.extra,
-        time_end=time.time(),
-        evaluation_duration=result.cost,
+        time_end=(time_end := time.time()),
+        # From when the trial was handed off, so with any time the job was queued
+        evaluation_duration=(
+            None
+            if trial.metadata.time_started is None
+            else time_end - trial.metadata.time_started
+        ),
         inference_cost=result.inference_cost,
         downstream_performances=result.downstream_performances,
         n_params=result.n_params,

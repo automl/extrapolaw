@@ -199,12 +199,16 @@ def test_chinchilla3_needs_three_rows() -> None:
         chinchilla3.fit_coarse([(1.0, 1.0, 1.0, 6.0)], best_loss_guess=1.0)
 
 
-def _import_run(root: Path, n: int = 60) -> None:
+def _import_run(root: Path, n: int = 60, *, report_scale: bool = False) -> None:
+    """A run of the synthetic law, whose reports have `n_params` and `n_data` with
+    `report_scale`.
+    """
     extrapolaw.import_trials(
         [
             (
                 {"n_params": r[0], "n_data": r[1]},
-                {"objective_to_minimize": r[2], "cost": r[3]},
+                {"objective_to_minimize": r[2], "cost": r[3]}
+                | ({"n_params": r[0], "n_data": r[1]} if report_scale else {}),
             )
             for r in _synthetic(n=n)
         ],
@@ -226,20 +230,23 @@ def test_predict_from_a_run(tmp_path: Path) -> None:
     assert power.n_params is None
     assert set(power.info or {}) == {Target.LOSS, Target.FULL}
 
-    predictions = extrapolaw.predict(
-        root,
-        [1e20, 1e21],
-        predictor="chinchilla3",
-        params_estimator=lambda n_params: n_params,
-        data_parameter_name="n_data",
-        best_loss_guess=TRUE_LAW.E * 1.5,
-    )
+    # Chinchilla's law, and the COARSE power law, are fitted on the reported scale
+    with pytest.raises(ValueError, match="no `n_params` or `n_data`"):
+        extrapolaw.predict(root, 1e21, predictor="chinchilla3")
+    with pytest.raises(ValueError, match="no `n_params` or `n_data`"):
+        extrapolaw.predict(root, 1e21, targets=[Target.COARSE])
+
+    scaled = tmp_path / "scaled"
+    _import_run(scaled, report_scale=True)
+    (power,) = extrapolaw.predict(scaled, 1e21)
+    assert power.n_params is not None
+    predictions = extrapolaw.predict(scaled, [1e20, 1e21], predictor="chinchilla3")
     assert [p.target_cost for p in predictions] == [1e20, 1e21]
     n_params, _n_data, _loss = chinchilla3.optimum(TRUE_LAW, 1e21)
     assert predictions[1].n_params == pytest.approx(n_params, rel=0.05)
 
     with pytest.raises(ValueError, match="does not predict"):
-        extrapolaw.predict(root, 1e21, predictor="chinchilla3", targets=[Target.FULL])
+        extrapolaw.predict(scaled, 1e21, predictor="chinchilla3", targets=[Target.FULL])
     with pytest.raises(ValueError, match="Unknown predictor"):
         extrapolaw.predict(root, 1e21, predictor="nope")
 

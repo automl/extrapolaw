@@ -3,38 +3,8 @@ message: "If you use this software, please cite it as below."
 authors:
   - family-names: Alipour
     given-names: Nastaran
-  - family-names: Mallik
-    given-names: Neeratyoy
-  - family-names: Bergman
-    given-names: Eddie
-  - family-names: Geburek
-    given-names: Anton Merlin
-  - family-names: Schrodi
-    given-names: Simon
-  - family-names: Basu
-    given-names: Soham
-  - family-names: Birinxhiku
-    given-names: Lum
-  - family-names: Abou Chakra
-    given-names: Tarek
-  - family-names: Garibov
-    given-names: Samir
-  - family-names: Gaur
-    given-names: Gopalji
-  - family-names: Janowski
-    given-names: Maciej
-  - family-names: Mekic
-    given-names: Ema
   - family-names: Ambattu
     given-names: Philip Alex
-  - family-names: Rogalla
-    given-names: Daniel
-  - family-names: Hvarfner
-    given-names: Carl
-  - family-names: Binxin
-    given-names: Ru
-  - family-names: Carstensen
-    given-names: Timur
   - family-names: Hog
     given-names: Johannes
   - family-names: Hutter
@@ -43,5 +13,5 @@ authors:
     given-names: Danny
 title: "Extrapolaw"
 version: 0.1.0
-date-released: 2026-10-10
+date-released: 2026-11-23
 url: "https://github.com/automl/extrapolaw"

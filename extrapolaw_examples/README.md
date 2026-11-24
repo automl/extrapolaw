@@ -1,5 +1,7 @@
 # Overview
 
+Looking for a guided walkthrough instead? Try the [Extrapolaw Demo](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb) in Google Colab.
+
 1. **Basic usage examples** demonstrate fundamental usage.
 Learn how to perform Hyperparameter Optimization (HPO) and analyze runs on a basic level.
 

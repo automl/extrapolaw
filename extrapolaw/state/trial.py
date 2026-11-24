@@ -60,7 +60,7 @@ class Report:  # noqa: PLW1641
 
     objective_to_minimize: float | None
     cost: float | None
-    learning_curve: list[float] | None
+    learning_curve: list[float] | list[list[float]] | None
     extra: Mapping[str, Any]
     err: Exception | None
     tb: str | None
@@ -192,6 +192,8 @@ class Trial:
                     objective_to_minimize=imported_conf.result["objective_to_minimize"],
                     cost=imported_conf.result.get("cost"),
                     learning_curve=imported_conf.result.get("learning_curve"),
+                    n_params=imported_conf.result.get("n_params"),
+                    n_data=imported_conf.result.get("n_data"),
                     extra={},
                     err=None,
                     tb=None,
@@ -219,7 +221,7 @@ class Trial:
         time_end: float,
         objective_to_minimize: float | None,
         cost: float | None,
-        learning_curve: list[float] | None,
+        learning_curve: list[float] | list[list[float]] | None,
         err: Exception | None,
         tb: str | None,
         extra: dict[str, Any] | None,

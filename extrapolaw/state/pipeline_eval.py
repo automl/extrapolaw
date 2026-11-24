@@ -53,8 +53,10 @@ class UserResultDict(TypedDict, total=False):
     exception: Exception | None
     """The exception that occured."""
 
-    learning_curve: Sequence[float] | None
-    """The learning curve for this configuration."""
+    learning_curve: Sequence[float] | Sequence[Sequence[float]] | None
+    """The learning curve for this configuration: the loss at each checkpoint, or
+    rows of `(n_data, flops, loss)`, which Chinchilla approach 1 and the power law
+    fit on."""
 
     info_dict: Mapping[str, Any] | None
     """Extra information that will be stored with the trials result."""
@@ -80,7 +82,7 @@ class UserResult:
 
     objective_to_minimize: float | None = None
     cost: float | None = None
-    learning_curve: list[float] | None = None
+    learning_curve: list[float] | list[list[float]] | None = None
     extra: dict[str, Any] = field(default_factory=dict)
     exception: Exception | None = None
     inference_cost: float | None = None
@@ -126,13 +128,18 @@ class UserResult:
 
             match self.learning_curve:
                 case Sequence():
-                    self.learning_curve = [float(v) for v in self.learning_curve]
+                    # Rows as lists, so that they are saved to YAML as plain lists
+                    self.learning_curve = [
+                        [float(x) for x in v] if isinstance(v, Sequence) else float(v)
+                        for v in self.learning_curve
+                    ]  # type: ignore[assignment]
                 case None:
                     pass
                 case _:
                     raise ValueError(
-                        "The 'learning_curve' should be either a sequence of floats or"
-                        f" None. Got {self.learning_curve}"
+                        "The 'learning_curve' should be a sequence of floats, a"
+                        " sequence of (n_data, flops, loss) rows, or None."
+                        f" Got {self.learning_curve}"
                     )
 
             match self.exception:
@@ -216,7 +223,7 @@ class UserResult:
         """Parse the return type a user can provide from `evaluate_pipeline`."""
         objective_to_minimize: float | None
         cost: float | None
-        learning_curve: list[float] | None
+        learning_curve: list[float] | list[list[float]] | None
         extra_info: dict[str, Any]
         exception: Exception | None
 

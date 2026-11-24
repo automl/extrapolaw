@@ -271,6 +271,10 @@ As a result, you can start multiple [`extrapolaw.acquire()`][extrapolaw.api.acqu
 and they will synchronize, **as long as they share the same `root_directory=`**.
 Any new workers that come online will automatically pick up work and work together to until the budget is exhausted.
 
+!!! tip "Interactive tutorial"
+
+    The [Extrapolaw demo](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb) runs several workers in parallel on one `root_directory`, sharing a single FLOP budget.
+
 === "Worker script"
 
     ```python
@@ -359,7 +363,7 @@ Once cleaned, you can restart the optimization and workers will pick up from the
 For more details on the clean command, see the [Cleaning Up Trials documentation](./clean.md).
 
 ## Selecting an Optimizer
-By default Extrapolaw selects the optimizer based on your `pipeline_space=`, one of the arguments to [`extrapolaw.acquire()`][extrapolaw.api.acquire]: `bayesian_optimization` for a space without priors and fidelities, and `random_search` otherwise, see [automatic optimizer selection](optimizers.md#21-automatic-optimizer-selection).
+By default [`extrapolaw.acquire()`][extrapolaw.api.acquire] uses `random_search`. With `optimizer="auto"`, Extrapolaw selects the optimizer based on your `pipeline_space=`: `bayesian_optimization` for a space without priors and fidelities, and `random_search` otherwise, see [automatic optimizer selection](optimizers.md#21-automatic-optimizer-selection).
 
 You can also manually select a specific or custom optimizer that better matches your specific needs.
 For more information about the available optimizers and how to customize your own, refer [here](../reference/optimizers.md).

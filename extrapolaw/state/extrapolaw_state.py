@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import pickle
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
 
@@ -362,9 +363,7 @@ class ExtrapolawState:  # noqa: PLW1641
                     opt_state.worker_ids = []
 
                 opt_state.worker_ids.append(worker_id)
-            bytes_ = pickle.dumps(opt_state, protocol=pickle.HIGHEST_PROTOCOL)
-            with atomic_write(self._optimizer_state_path, "wb") as f:
-                f.write(bytes_)
+            _replace_with_pickle(self._optimizer_state_path, opt_state)
             return worker_id
 
     def lock_and_read_trials(self) -> dict[str, Trial]:
@@ -550,8 +549,7 @@ class ExtrapolawState:  # noqa: PLW1641
 
         opt_state.shared_state = shared_state
         opt_state.seed_snapshot.recapture()
-        with self._optimizer_state_path.open("wb") as f:
-            pickle.dump(opt_state, f, protocol=pickle.HIGHEST_PROTOCOL)
+        _replace_with_pickle(self._optimizer_state_path, opt_state)
 
         if n is None:
             assert len(sampled_trials) == 1
@@ -661,12 +659,7 @@ class ExtrapolawState:  # noqa: PLW1641
             if total_cost_to_spend is not None:
                 optimizer_state.budget.total_cost_to_spend = total_cost_to_spend
 
-            with atomic_write(self._optimizer_state_path, "wb") as f:
-                pickle.dump(
-                    optimizer_state,
-                    f,
-                    protocol=pickle.HIGHEST_PROTOCOL,
-                )
+            _replace_with_pickle(self._optimizer_state_path, optimizer_state)
 
     def lock_and_get_global_budgets(
         self,
@@ -916,6 +909,8 @@ class ExtrapolawState:  # noqa: PLW1641
                         f"\nOn disk: {existing_info}"
                         f"\n   Loaded from {path}."
                         f"\nProvided: {optimizer_info}"
+                        "\nPass the same `optimizer` to `extrapolaw.acquire`, or"
+                        ' `optimizer="auto"` to continue with the one on disk.'
                     )
             with optimizer_state_path.open("rb") as f:
                 optimizer_state = pickle.load(f)  # noqa: S301
@@ -987,14 +982,14 @@ class ExtrapolawState:  # noqa: PLW1641
             assert optimizer_info is not None
             assert optimizer_state is not None
 
-            serialize(optimizer_info, path=optimizer_info_path)
-            with optimizer_state_path.open("wb") as f:
-                pickle.dump(optimizer_state, f, protocol=pickle.HIGHEST_PROTOCOL)
+            # Workers starting together may all create the run, while others already
+            # load it: each file is replaced whole, never seen half-written, and
+            # `optimizer_info.yaml`, which tells other workers the run exists, last
+            _replace_with_pickle(optimizer_state_path, optimizer_state)
 
             # Save pipeline space if provided
             if pipeline_space is not None:
-                with atomic_write(pipeline_space_path, "wb") as f:
-                    pickle.dump(pipeline_space, f, protocol=pickle.HIGHEST_PROTOCOL)
+                _replace_with_pickle(pipeline_space_path, pipeline_space)
 
                 # Reload the pipeline space from disk so that the instance
                 # returned by `create_or_load` matches the on-disk representation
@@ -1012,6 +1007,9 @@ class ExtrapolawState:  # noqa: PLW1641
                     # unexpected errors.
                     logger.warning("Reloading pipeline_space after write failed: %s", e)
 
+            temporary = _temporary_path(optimizer_info_path)
+            serialize(optimizer_info, path=temporary)
+            temporary.replace(optimizer_info_path)
             error_dump = ErrDump([])
 
         return ExtrapolawState(
@@ -1092,3 +1090,18 @@ def _optimizer_info_matches(on_disk: OptimizerInfo, provided: OptimizerInfo) -> 
 
 def _get_worker_name(idx: int) -> str:
     return f"worker_{idx}"
+
+
+def _temporary_path(path: Path) -> Path:
+    """A path next to `path` to write it to first, unique to this process."""
+    return path.with_name(f".{path.name}.{os.getpid()}.tmp")
+
+
+def _replace_with_pickle(path: Path, obj: Any) -> None:
+    """Pickle `obj` to `path`, replacing it whole, so readers never see it partly
+    written.
+    """
+    temporary = _temporary_path(path)
+    with atomic_write(temporary, "wb") as f:
+        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+    temporary.replace(path)

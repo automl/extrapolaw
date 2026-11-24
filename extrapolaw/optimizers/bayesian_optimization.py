@@ -241,6 +241,15 @@ class BayesianOptimization(ScalingOptimizer):
             cap = min(cap, self.max_cost_per_config)
         return cap
 
+    @property
+    def predictor(self) -> str:  # type: ignore[override]
+        """ScAn extrapolates with its own Gaussian process, the GP posterior, while the
+        other acquisitions fit a power law, as other scaling optimizers do.
+        """
+        return (
+            "gp_posterior" if self.acquisition_func_type == "IT-SCAN-JES" else "power_law"
+        )
+
     def _cost_estimator_with_constants(self) -> Callable[..., float] | None:
         if self.cost_estimator is None:
             return None
@@ -249,6 +258,13 @@ class BayesianOptimization(ScalingOptimizer):
         return lambda **config: estimator(**{**constants, **config})
 
     def __post_init__(self) -> None:
+        schedules = ("none", "space_expansion", "left_budget_contraction")
+        if self.budget_schedule not in schedules:
+            # An unknown name would mix the two schedules and fail mid-run
+            raise ValueError(
+                f"Unknown budget_schedule {self.budget_schedule!r}, choose one of"
+                f" {list(schedules)}."
+            )
         if isinstance(self.space, PipelineSpace):
             converted_space = convert_extrapolaw_to_classic_search_space(self.space)
             if converted_space is not None:
@@ -260,6 +276,21 @@ class BayesianOptimization(ScalingOptimizer):
                     " space-compatible optimizer."
                 )
         self.design_samples: list[dict[str, Any]] | None = None
+        self._space_log_costs: tuple[float, float] | None = None
+
+    def _space_log_cost_range(
+        self, bounds: torch.Tensor, log_cost: LogCost
+    ) -> tuple[float, float]:
+        """The `log10` cost of the cheapest and the most expensive config of the space.
+
+        Estimated once, from the corners of the space and a fixed Sobol sample, so that
+        it does not move from one round to the next.
+        """
+        if self._space_log_costs is None:
+            sobol = draw_sobol_samples(bounds=bounds, n=4096, q=1, seed=0).squeeze(1)
+            costs = log_cost.evaluate(torch.cat([bounds, sobol.to(bounds.dtype)]))
+            self._space_log_costs = (float(costs.min()), float(costs.max()))
+        return self._space_log_costs
 
     def __call__(
         self,
@@ -398,16 +429,16 @@ class BayesianOptimization(ScalingOptimizer):
         # Pending trials count too, so parallel workers see each other's spend
         spent = sum(self.cost_estimator(**trial.config) for trial in trials.values())
         is_initial_design = len(trials) < self.n_initial_design
-        cost_bounds = (
-            self._min_schedule_cap(total),
-            self.max_cost_per_config or total,
-        )
+        min_cap = self._min_schedule_cap(total)
+        # Not `min_cap`: as the low end of the cost term of the acquisition it would
+        # make every config under it equally cheap, so no config would cost more
+        max_cost_bound = self.max_cost_per_config or total
 
         left = total - spent
-        if left < cost_bounds[0]:
+        if left < min_cap:
             raise BudgetExhaustedError(
                 f"Only {left:e} of the cost budget {total:e} is left, less than the"
-                f" {cost_bounds[0]:e} of the cheapest config the schedule samples."
+                f" {min_cap:e} of the cheapest config the schedule samples."
             )
 
         max_cost = self._schedule_cap(spent, total, is_initial_design=is_initial_design)
@@ -417,7 +448,7 @@ class BayesianOptimization(ScalingOptimizer):
         )
         try:
             return self._sample_candidates(
-                trials, budget_info, n, max_cost=max_cost, cost_bounds=cost_bounds
+                trials, budget_info, n, max_cost=max_cost, max_cost_bound=max_cost_bound
             )
         except ConstraintViolationError as e:
             error = e
@@ -432,7 +463,11 @@ class BayesianOptimization(ScalingOptimizer):
             )
             try:
                 return self._sample_candidates(
-                    trials, budget_info, n, max_cost=next_cost, cost_bounds=cost_bounds
+                    trials,
+                    budget_info,
+                    n,
+                    max_cost=next_cost,
+                    max_cost_bound=max_cost_bound,
                 )
             except ConstraintViolationError as e:
                 error, max_cost = e, next_cost
@@ -451,11 +486,11 @@ class BayesianOptimization(ScalingOptimizer):
         n: int | None = None,
         *,
         max_cost: float | None = None,
-        cost_bounds: tuple[float, float] | None = None,
+        max_cost_bound: float | None = None,
     ) -> SampledConfig | list[SampledConfig]:
-        """Sample the configs with a cost up to `max_cost`, and `cost_bounds` the
-        smallest and largest cost the schedule samples, to normalize the cost term of the
-        acquisition with.
+        """Sample the configs with a cost up to `max_cost`, and `max_cost_bound` the
+        largest cost the schedule samples, the high end of the cost term of the
+        acquisition. Its low end is the cheapest config of the space.
         """
         assert not isinstance(self.space, PipelineSpace)  # Converted in __post_init__
         # If fidelities exist, sample from them as normal
@@ -740,26 +775,6 @@ class BayesianOptimization(ScalingOptimizer):
                 [lower, upper], dtype=torch.float64, device=data.x.device
             )
 
-            # Build a candidate set restricted to configs near C_target. The optima
-            # at the target are never evaluated, so the pool only keeps the user
-            # constraint, not the cap of the budget schedule or
-            # `max_cost_per_config`, which the target usually lies beyond. The
-            # acquisition itself is still optimized under both.
-            raw_candidates = (
-                draw_sobol_samples(bounds=bounds, n=2048, q=1)
-                .squeeze(1)
-                .to(dtype=torch.float64)
-            )
-            user_constraint = self.constraints_func
-            if user_constraint is not None:
-                constants = {**self.space.constants, **fidelity_upper}
-                raw_candidates = _feasible_candidates(
-                    raw_candidates,
-                    encode_constraints_func(
-                        lambda config: user_constraint({**constants, **config}),
-                        encoder=encoder,
-                    ),
-                )
             target_cost = self.target_cost
             if target_cost is None:
                 raise ValueError(
@@ -768,27 +783,22 @@ class BayesianOptimization(ScalingOptimizer):
                 )
             assert cost_estimator is not None
             log_cost = LogCost(encoder, cost_estimator)
-            log10_target = math.log10(target_cost)
-            distance = (log_cost.evaluate(raw_candidates) - log10_target).abs()
-            # Widen the window around the target cost until it holds enough
-            # candidates, starting at 2/3 to 1.5x the target
-            for factor in (1.5, 3.0, 10.0):
-                in_window = distance < math.log10(factor)
-                if in_window.sum() >= 4:
-                    if factor > 1.5:
-                        logger.warning(
-                            "Too few candidates cost within 1.5x of the target"
-                            f" {target_cost:e}, sampling the optima over"
-                            f" those within {factor}x."
-                        )
-                    break
-            else:
-                logger.warning(
-                    "No window around the target cost holds enough candidates,"
-                    " sampling the optima over all candidates."
+
+            # The optima are the ones at the target cost, which may lie beyond what a
+            # config of this round may cost: they are sampled over the whole space,
+            # only the user constraint applies, not the cap of the budget schedule or
+            # `max_cost_per_config`. The acquisition itself is still optimized under
+            # both.
+            user_constraints_func = None
+            if self.constraints_func is not None:
+                user, constants = self.constraints_func, self.space.constants
+                user_constraints_func = encode_constraints_func(
+                    lambda config: user({**constants, **config, **fidelity_upper}),
+                    encoder=encoder,
                 )
-                in_window = torch.ones_like(in_window)
-            candidate_set = raw_candidates[in_window]
+            candidate_set = _candidates_near_target(
+                bounds, log_cost, target_cost, user_constraints_func
+            )
 
             # Sample S posterior paths over the C_target-filtered candidate set
             # and take the argmin of each path to get fantasy optima at C_target.
@@ -800,27 +810,24 @@ class BayesianOptimization(ScalingOptimizer):
                 raise ValueError("NaN in modified-JES optimal samples")
 
             # Fixed bounds for the normalized cost term, so it doesn't move with
-            # the costs observed so far. The lower one is the cheapest config of the
-            # space, not the cheapest the schedule samples: cheaper configs stay
-            # feasible after the initial design, and below the lower bound the cost
-            # term clamps to its epsilon, which would favour all of them alike
-            if cost_bounds is None:
-                top_cost = self.max_cost_per_config or float(
-                    10 ** log_cost.evaluate(raw_candidates).max()
-                )
-            else:
-                top_cost = cost_bounds[1]
-            lowest_log_cost = torch.cat(
-                [log_cost.evaluate(bounds[:1]), log_cost.evaluate(raw_candidates)]
-            ).min()
-            cost_bounds = (float(10**lowest_log_cost), top_cost)
+            # the costs observed so far. The low end is the cheapest config of the
+            # space, under it `c_norm` is clamped at its epsilon and every config
+            # would be equally (and very) cheap.
+            space_min_log, space_max_log = self._space_log_cost_range(bounds, log_cost)
+            c_max_log = (
+                math.log10(max_cost_bound)
+                if max_cost_bound is not None
+                else math.log10(self.max_cost_per_config)
+                if self.max_cost_per_config is not None
+                else space_max_log
+            )
             acquisition = CostWeightedModifiedJES(
                 model=gp,
                 optimal_inputs=optimal_inputs,
                 optimal_outputs=optimal_outputs,
                 log_cost=log_cost,
-                c_min_log=math.log10(cost_bounds[0]),
-                c_max_log=math.log10(cost_bounds[1]),
+                c_min_log=space_min_log,
+                c_max_log=c_max_log,
             )
         else:
             raise NotImplementedError(
@@ -940,6 +947,50 @@ def _feasible_candidates(
         )
         return candidates
     return candidates[feasible]
+
+
+def _candidates_near_target(
+    bounds: torch.Tensor,
+    log_cost: LogCost,
+    target_cost: float,
+    encoded_constraints_func: Callable[[torch.Tensor], torch.Tensor] | None,
+    *,
+    n: int = 2048,
+    max_draws: int = 8,
+    min_count: int = 64,
+) -> torch.Tensor:
+    """The (encoded) Sobol candidates of the space that cost within 1.5x of the target
+    cost, to sample the optima at the target over.
+
+    The configs near the target can be a small part of the space, so up to `max_draws`
+    batches of `n` are drawn until `min_count` lie within 1.5x. With too few even then,
+    the window widens to 3x and 10x, and the last fallback is the whole pool.
+    """
+    log10_target = math.log10(target_cost)
+    pool = torch.empty((0, bounds.shape[-1]), dtype=torch.float64, device=bounds.device)
+    for _ in range(max_draws):
+        batch = draw_sobol_samples(bounds=bounds, n=n, q=1).squeeze(1)
+        batch = _feasible_candidates(batch.to(torch.float64), encoded_constraints_func)
+        pool = torch.cat([pool, batch])
+        distance = (log_cost.evaluate(pool) - log10_target).abs()
+        if (distance < math.log10(1.5)).sum() >= min_count:
+            break
+
+    for factor in (1.5, 3.0, 10.0):
+        in_window = distance < math.log10(factor)
+        if in_window.sum() >= 4:
+            if factor > 1.5:
+                logger.warning(
+                    "Too few candidates cost within 1.5x of the target cost"
+                    f" {target_cost:e}, sampling the optima over those within"
+                    f" {factor}x."
+                )
+            return pool[in_window]
+    logger.warning(
+        "No window around the target cost holds enough candidates, sampling the"
+        " optima over all candidates."
+    )
+    return pool
 
 
 def _sample_optima(

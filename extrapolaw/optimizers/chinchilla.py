@@ -781,52 +781,57 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
         learning_curves: list[list[_ScalingPoint]],
         front: list[_ScalingPoint],
     ) -> Figure:
-        from matplotlib.colors import Normalize
+        from matplotlib.colors import LogNorm, Normalize
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        norm = Normalize(vmin=min(param_counts), vmax=max(param_counts))
+        from extrapolaw.plot.scaling_plots import INK, PARETO_COLOR, _style
+
+        fig, ax = plt.subplots(figsize=(7.2, 4.4))
+        low, high = min(param_counts), max(param_counts)
+        norm = LogNorm(vmin=low, vmax=high) if high > low > 0 else Normalize(low, high)
         cmap = plt.colormaps["viridis"]
 
-        # Plot learning curves, colored by parameter count
+        # The learning curves, coloured by parameter count
         for curve in learning_curves:
             ax.plot(
                 [point.flops for point in curve],
                 [point.loss for point in curve],
-                linewidth=1,
-                alpha=0.15,
+                linewidth=1.5,
+                alpha=0.8,
                 color=cmap(norm(curve[0].n_params)),
                 zorder=1,
             )
 
-        # Overlay the power law fitted to the Pareto front
+        # Their frontier, and the power law fitted to it
+        front = sorted(front, key=lambda point: point.flops)
         front_flops = [point.flops for point in front]
+        ax.scatter(
+            front_flops,
+            [point.loss for point in front],
+            s=36,
+            color=PARETO_COLOR,
+            edgecolors="white",
+            linewidths=1,
+            zorder=3,
+            label="Pareto frontier",
+        )
         fit = fit_power_law(front_flops, [point.loss for point in front])
         if fit is not None:
             ax.plot(
                 front_flops,
                 _power_law_curve(fit, front_flops),
-                "g--",
-                linewidth=2.5,
-                alpha=0.9,
-                label=f"Pareto fit (slope={fit.slope:.3f})",
-                zorder=3,
+                color=INK,
+                linestyle=(0, (4, 3)),
+                linewidth=2,
+                label=f"Power law fit (slope {fit.slope:.3f})",
+                zorder=2,
             )
-            ax.legend(loc="best", fontsize=10)
 
-        # Configure axes
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.set_xlabel("FLOPs", fontsize=12)
-        ax.set_ylabel("Training Loss", fontsize=12)
-        ax.set_title("Training Loss vs FLOPs with Pareto Front (LC-Aware)", fontsize=14)
-        ax.grid(visible=True, linestyle="--", alpha=0.3)
-
-        # Add colorbar
+        ax.set(xscale="log", yscale="log")
+        _style(ax, "Learning curves and their frontier", "FLOPs", "Loss")
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        plt.colorbar(sm, ax=ax, label="Parameters")
-
-        plt.tight_layout()
+        fig.colorbar(sm, ax=ax, label="Parameters")
+        fig.tight_layout()
         return fig
 
     def get_trial_artifacts(

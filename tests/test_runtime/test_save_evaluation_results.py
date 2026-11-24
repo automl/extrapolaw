@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pytest_cases import fixture
 
+import extrapolaw
 from extrapolaw import Float, PipelineSpace, analyze, save_pipeline_results
 from extrapolaw.optimizers import OptimizerInfo
 from extrapolaw.optimizers.algorithms import random_search
@@ -210,3 +211,69 @@ def test_analyze_missing_directory_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         analyze(missing)
     assert not missing.exists()
+
+
+def test_async_acquire_refuses_an_evaluate_pipeline(tmp_path: Path) -> None:
+    """With `is_async=True`, `acquire` only samples, so it takes no function."""
+    with pytest.raises(ValueError, match="must be None"):
+        extrapolaw.acquire(
+            evaluate_pipeline=lambda **_: None,
+            pipeline_space=ASpace(),
+            root_directory=tmp_path / "root",
+            is_async=True,
+            worker_evaluations_to_spend=1,
+        )
+    assert not (tmp_path / "root").exists()
+
+
+def test_sync_acquire_requires_an_evaluate_pipeline(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="is required"):
+        extrapolaw.acquire(
+            pipeline_space=ASpace(),
+            root_directory=tmp_path / "root",
+            worker_evaluations_to_spend=1,
+        )
+
+
+def test_async_acquire_samples_configs_a_job_reports_later(tmp_path: Path) -> None:
+    """`acquire(is_async=True)` leaves its configs pending in `config.yaml`, and
+    `save_pipeline_results` completes them.
+    """
+    root = tmp_path / "root"
+    extrapolaw.acquire(
+        pipeline_space=ASpace(),
+        root_directory=root,
+        is_async=True,
+        worker_evaluations_to_spend=2,
+    )
+
+    config_dirs = sorted((root / "configs").glob("config_*"))
+    assert len(config_dirs) == 2
+    assert all((d / "config.yaml").exists() for d in config_dirs)
+    assert not any((d / "report.yaml").exists() for d in config_dirs)
+
+    pipeline_id = config_dirs[0].name.removeprefix("config_")
+    save_pipeline_results(
+        user_result={"objective_to_minimize": 0.3, "cost": 1.0},
+        pipeline_id=pipeline_id,
+        root_directory=root,
+    )
+    states = {
+        trial.id: trial.metadata.state
+        for trial in ExtrapolawState.create_or_load(root, load_only=True)
+        .lock_and_read_trials()
+        .values()
+    }
+    assert states[pipeline_id] == Trial.State.SUCCESS
+    assert list(states.values()).count(Trial.State.EVALUATING) == 1
+
+
+def test_acquire_defaults_to_random_search(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    extrapolaw.acquire(
+        evaluate_pipeline=lambda a: {"objective_to_minimize": a, "cost": 1.0},
+        pipeline_space=ASpace(),
+        root_directory=root,
+        worker_evaluations_to_spend=1,
+    )
+    assert extrapolaw.load_optimizer_info(root)["name"] == "random_search"

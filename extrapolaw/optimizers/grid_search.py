@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from extrapolaw.exceptions import BudgetExhaustedError
 from extrapolaw.optimizers.optimizer import (
     ImportedConfig,
     SampledConfig,
@@ -55,7 +56,10 @@ class GridSearch(ScalingOptimizer):
             None,
         )
         if config is None:
-            raise ValueError("Grid search exhausted or no valid configs found!")
+            # Retrying cannot help, the list is fixed, so the worker stops cleanly
+            raise BudgetExhaustedError(
+                "Grid search has evaluated every configuration that fits the cost limits."
+            )
 
         max_id = _get_max_trial_id(trials)
         next_id = 0 if max_id is None else max_id + 1

@@ -3,7 +3,7 @@
 Uses the existing cache if full, else local `.tar` shards, else streams from the HF Hub.
 
     python pipeline/download_data.py                       # 100k samples, the default
-    python pipeline/download_data.py --n_samples 22000     # smallest cache train.py accepts (N_TRAIN + N_VAL)
+    python pipeline/download_data.py --n_samples 100000    # what train.py reads by default (N_TRAIN_CACHE + N_VAL)
     python pipeline/download_data.py --shards_dir /path/to/train_data
     python pipeline/download_data.py --cache_dir /work/$USER/laion_cache
 
@@ -21,7 +21,7 @@ from common import (
     prepare_laion,
 )
 
-# #CHANGE_ME: how many image/caption pairs to cache. Must cover N_TRAIN + N_VAL
+# #CHANGE_ME: how many image/caption pairs to cache. Must cover N_TRAIN_CACHE + N_VAL
 # in `pipeline/train.py`.
 DEFAULT_N_SAMPLES = 100_000
 

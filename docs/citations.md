@@ -7,15 +7,15 @@ For citing Extrapolaw, please refer to the following:
 ### APA Style
 
 ```apa
-Nastaran A., Mallik, N., Bergman, E., Geburek, A. M., Schrodi, S., Basu, S., Birinxhiku, L., Abou Chakra, T., Garibov, S., Gaur, G., Alipour, N., Janowski, M., Hvarfner, C., Mekic, E., Carstensen, T., Rogalla, D., Ru, B., Hutter, F. & Stoll, D. (2026). Extrapolaw (Version 0.1.0) [Computer software]. https://github.com/automl/extrapolaw
+ Alipour, N., Ambattu, P., Hog, J. Hutter, F. & Stoll, D. (2026). Extrapolaw (Version 0.1.0) [Computer software]. https://github.com/automl/extrapolaw
 ```
 
 ### BibTex Style
 
 ```bibtex
 @software{Alipour_Automated_Scaling_Analysis_2026,
-author = {Nastaran Alipour, Neeratyoy Mallik, Eddie Bergman, Anton Merlin Geburek, Simon Schrodi, Soham Basu, Lum Birinxhiku, Tarek Abou Chakra, Samir Garibov, Gopalji Gaur, Maciej Janowski, Ema Mekic, Philip Alex Ambattu, Daniel Rogalla, Carl Hvarfner, Binxin Ru, Timur Carstensen, Johannes Hog, Frank Hutter and Danny Stoll},
-month = sep,
+author = {Nastaran Alipour, Philip Alex Ambattu, Johannes Hog, Frank Hutter and Danny Stoll},
+month = nov,
 title = {{Extrapolaw}},
 url = {https://github.com/automl/extrapolaw},
 version = {0.1.0},

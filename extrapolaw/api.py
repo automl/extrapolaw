@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from ConfigSpace import ConfigurationSpace
 
     from extrapolaw.optimizers.algorithms import CustomOptimizer
+    from extrapolaw.plot.scaling_plots import Estimators
     from extrapolaw.prediction import Prediction, PredictorTypes, Target
     from extrapolaw.space import SearchSpace
     from extrapolaw.state.pipeline_eval import EvaluatePipelineReturn, UserResultDict
@@ -51,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
-    evaluate_pipeline: Callable[..., EvaluatePipelineReturn] | str,
+    evaluate_pipeline: Callable[..., EvaluatePipelineReturn] | str | None = None,
     pipeline_space: ConfigurationSpace | PipelineSpace | None = None,
     *,
     root_directory: str | Path = "extrapolaw_results",
@@ -79,7 +80,7 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
         | Callable[Concatenate[SearchSpace | PipelineSpace, ...], AskFunction]  # Pipeline
         | CustomOptimizer
         | Literal["auto"]
-    ) = "auto",
+    ) = "random_search",
 ) -> None:
     """Run the optimization.
 
@@ -152,6 +153,8 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 to specify the function to call. You may also directly provide
                 an mode to import, e.g., `"my.module.something:evaluate_pipeline"`.
 
+            Leave it `None` with `is_async=True`, which only samples configurations.
+
         pipeline_space: The pipeline space to minimize over.
 
             !!! tip "Optional for continuing runs"
@@ -210,14 +213,16 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
         overwrite_root_directory: If true, delete the working directory at the start of
             the run. This is, e.g., useful when debugging a evaluate_pipeline function.
 
-        is_async: If true, the optimizer will not wait for the results from evaluation_pipeline before asking for new configurations.
+        is_async: If true, only sample configurations, without evaluating them. Each
+            one is written to `root_directory/configs/config_<id>/config.yaml` and
+            left pending; launch a job for it yourself (e.g. with Slurm), and report
+            its result from the job with
+            [`extrapolaw.save_pipeline_results()`][extrapolaw.api.save_pipeline_results].
+            Requires `evaluate_pipeline=None`.
             ??? note "tradeoff of async mode"
-            This is useful when you have multiple workers running in parallel,
-            and you don't want to wait in the main thread for the results of
-            the evaluation_pipeline before asking for new configurations.
-            This can speed up the optimization process, but it also means that
-            the optimizer will not have access to the results of previous evaluations
-            when asking for new configurations (Tradeoff: parallelism vs exploiting previous pipelines).
+                This can speed up the optimization process, but it also means that
+                the optimizer will not have access to the results of previous evaluations
+                when asking for new configurations (Tradeoff: parallelism vs exploiting previous pipelines).
 
         worker_evaluations_to_spend: Number of evaluations this specific call/worker should do.
             ??? note "Constraints on async mode"
@@ -327,8 +332,10 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
         optimizer: Which optimizer to use.
 
-            Not sure which to use? Leave this at `"auto"` and extrapolaw will
-            choose the optimizer based on the pipeline space given.
+            Not sure which to use? Leave this at its default, `"random_search"`.
+            With `"auto"`, extrapolaw chooses the optimizer based on the pipeline
+            space given, or, when continuing a run, uses the optimizer it was
+            started with.
 
             ??? note "Available optimizers"
 
@@ -405,6 +412,19 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
             " `dict` is no longer supported; please define your pipeline_space as a"
             " `PipelineSpace` subclass instead, e.g.:\n\n```python\nclass"
             " MySpace(PipelineSpace):\n    ...\n```\n"
+        )
+
+    if is_async and evaluate_pipeline is not None:
+        raise ValueError(
+            "With `is_async=True`, `acquire` only samples configurations, so"
+            " `evaluate_pipeline` must be None. Launch a job for every sampled"
+            " configuration (in `root_directory/configs/config_<id>/config.yaml`)"
+            " and report its result with `extrapolaw.save_pipeline_results`."
+        )
+    if not is_async and evaluate_pipeline is None:
+        raise ValueError(
+            "`evaluate_pipeline` is required, unless `is_async=True`, which only"
+            " samples configurations."
         )
 
     # Try to load pipeline_space from disk if not provided
@@ -557,7 +577,9 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
     )
 
     _eval: Callable
-    if isinstance(evaluate_pipeline, str):
+    if evaluate_pipeline is None:  # `is_async`: the configs are evaluated elsewhere
+        _eval = _sample_only
+    elif isinstance(evaluate_pipeline, str):
         module, funcname = evaluate_pipeline.rsplit(":", 1)
         eval_pipeline = dynamic_load_object(module, funcname)
         if not callable(eval_pipeline):
@@ -572,7 +594,7 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "evaluate_pipeline must be a callable or a string in the format"
             "'module:function'."
         )
-    if _cost_estimator is not None:
+    if _cost_estimator is not None and evaluate_pipeline is not None:
         _eval = _with_estimated_cost(_eval, _cost_estimator)
     if isinstance(space, PipelineSpace):
         _eval = adjust_evaluation_pipeline_for_extrapolaw_space(_eval, space)
@@ -605,6 +627,13 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
         "The summary folder has been created, with full.csv (all runs) and the plots."
         f"\nYou can find summary folder at: {summary_dir}."
     )
+
+
+def _sample_only(**_: Any) -> Any:
+    """The evaluation of `acquire(..., is_async=True)`: nothing, the configuration
+    stays pending until a job reports its result with `save_pipeline_results`.
+    """
+    return
 
 
 def _with_estimated_cost(
@@ -641,7 +670,7 @@ def _with_estimated_cost(
 def save_pipeline_results(
     user_result: dict,
     pipeline_id: str,
-    root_directory: Path,
+    root_directory: str | Path,
     *,
     live_plots: bool = False,
 ) -> None:
@@ -655,11 +684,12 @@ def save_pipeline_results(
         pipeline_id (str): Unique identifier of the pipeline/trial whose
             result is being stored. Used to locate the corresponding
             extrapolaw.core.trial.Trial object inside the optimisation state.
-        root_directory (Path): Root directory of the Extrapolaw run (contains
+        root_directory (str | Path): Root directory of the Extrapolaw run (contains
             optimizer_info.yaml and configs/ folder).
         live_plots (bool): Whether to also refresh the summary plots.
 
     """
+    root_directory = Path(root_directory)
     _save_results(
         user_result=user_result,
         trial_id=pipeline_id,
@@ -692,7 +722,7 @@ def analyze(root_directory: str | Path) -> None:
     logger.info(f"The summary has been refreshed at: {summary.summary_dir}.")
 
 
-def predict(  # noqa: PLR0913
+def predict(
     root_directory: str | Path,
     target_costs: float | Sequence[float] | None = None,
     *,
@@ -700,11 +730,7 @@ def predict(  # noqa: PLR0913
     predictor: str | PredictorTypes = "auto",
     targets: Iterable[Target] | None = None,
     params_estimator: Callable[..., float] | None = None,
-    data_parameter_name: str | None = None,
     cost_estimator: Callable[..., float] | None = None,
-    learning_curves: bool = True,
-    best_loss_guess: float | None = None,
-    exponent_bounds: tuple[float, float] | None = None,
     seed: int = 0,
     cache_dir: str | Path | None = None,
 ) -> list[Prediction]:
@@ -719,8 +745,6 @@ def predict(  # noqa: PLR0913
         "results",
         target_costs=[1e20, 1e21],
         predictor="chinchilla3",
-        params_estimator=estimate_params,
-        data_parameter_name="n_data",
     )
     for p in predictions:
         print(p.target_cost, p.loss, p.n_params, p.n_data)
@@ -736,33 +760,24 @@ def predict(  # noqa: PLR0913
             default.
         predictor: A [`PredictorTypes`][extrapolaw.prediction.PredictorTypes] or its
             name (`"power_law"`, `"chinchilla3"`, `"gp_posterior"`), or `"auto"` for
-            the one the run's optimizer names.
+            the one the run's optimizer names: `"chinchilla3"` for Chinchilla,
+            `"gp_posterior"` for ScAn, which needs `cost_estimator`, and
+            `"power_law"` otherwise.
         targets: The [`Target`][extrapolaw.prediction.Target]s to predict. By default
-            whatever the predictor provides, without `COARSE` when the trials have no
-            model size and data.
-        params_estimator: Called as `params_estimator(**config)` for the parameter
-            count of a trial, `extra["n_param"]` of its report is used without it.
-        data_parameter_name: The parameter that sets the amount of training data,
-            taken from the optimizer of the run if it has one, and from
-            `extra["n_data"]` of the reports otherwise.
-        cost_estimator: Called as `cost_estimator(**config)` for the flops of trials
-            that reported no cost. Needed by `"gp_posterior"`.
-        learning_curves: Fit the `COARSE` power law on the envelope of the learning
-            curves, reported as rows of `(n_data, flops, loss, ...)`, when there are
-            any.
-        best_loss_guess: Upper bound of the irreducible loss of `"chinchilla3"`, the
-            lowest observed loss by default.
-        exponent_bounds: Bounds of the exponents of `"chinchilla3"`.
+            whatever the predictor provides, without `COARSE` when not every trial
+            reported `n_params` and `n_data`.
+        params_estimator: Called as `params_estimator(**config)` by `"gp_posterior"`
+            for the model size of the config it predicts, which `COARSE` needs.
+        cost_estimator: Called as `cost_estimator(**config)` by `"gp_posterior"` for
+            the cost of the configs it considers, which it needs.
         seed: Seed of the `"gp_posterior"` candidate pool.
         cache_dir: Where `"gp_posterior"` checkpoints its fit and predictions.
 
     Returns:
         One [`Prediction`][extrapolaw.prediction.Prediction] per target budget.
     """
-    import numpy as np
-
+    from extrapolaw.plot.scaling_plots import Estimators
     from extrapolaw.prediction import (
-        Target,
         fit_and_predict,
         get_predictor_type,
         rows_from_trials,
@@ -777,15 +792,10 @@ def predict(  # noqa: PLR0913
     except FileNotFoundError as e:
         raise FileNotFoundError(f"No Extrapolaw run found at {root_directory}.") from e
 
-    if params_estimator is not None:
-        params_estimator = CostEstimator.from_callable(params_estimator)
-    if cost_estimator is not None:
-        cost_estimator = CostEstimator.from_callable(cost_estimator)
+    params_estimator = _estimator(params_estimator)
+    cost_estimator = _estimator(cost_estimator)
     optimizer_info = state.lock_and_get_optimizer_info()
 
-    if data_parameter_name is None:
-        stored = optimizer_info.get("info", {}).get("data_parameter_name")
-        data_parameter_name = stored if isinstance(stored, str) else None
     if predictor == "auto":
         predictor = optimizer_info.get("derived", {}).get("predictor", "power_law")
 
@@ -797,21 +807,8 @@ def predict(  # noqa: PLR0913
         prior_mean = "power_law"
 
     trials = list(state.lock_and_read_trials().values())
-    rows, curves, configs = rows_from_trials(
-        trials,
-        params_estimator=params_estimator,
-        data_parameter_name=data_parameter_name,
-        cost_estimator=cost_estimator,
-    )
-    if targets is None:
-        has_scale = any(np.isfinite(r[0]) and np.isfinite(r[1]) for r in rows)
-        targets = [
-            t
-            for t in Target
-            if t in predictor_type.provides
-            and (t != Target.COARSE or has_scale or params_estimator is not None)
-        ]
-    targets = list(targets)
+    rows, curves, configs = rows_from_trials(trials)
+    targets = _targets(predictor_type, targets, rows, params_estimator)
 
     space: SearchSpace | None = None
     # if Target.FULL in targets or predictor_type == PredictorTypes.GP_POSTERIOR:
@@ -833,18 +830,66 @@ def predict(  # noqa: PLR0913
         targets=targets,
         rows=rows,
         configs=configs,
-        learning_curve_rows=curves if learning_curves else None,
+        learning_curve_rows=curves,
         space=space,
         params_estimator=params_estimator,
         cost_estimator=cost_estimator,
-        best_loss_guess=best_loss_guess,
-        exponent_bounds=exponent_bounds,
         seed=seed,
         cache_dir=None if cache_dir is None else Path(cache_dir),
         prior_mean=prior_mean,
     )
-    _save_predictions(root_directory, trials, predictor_type.value, costs_by_kind, space)
+    _save_predictions(
+        root_directory,
+        trials,
+        predictor_type.value,
+        costs_by_kind,
+        space,
+        Estimators(params=params_estimator, cost=cost_estimator),
+    )
     return predictions
+
+
+def _estimator(fn: Callable[..., float] | None) -> CostEstimator | None:
+    """`fn(**config)` as a `CostEstimator`, which passes it only what it names."""
+    return None if fn is None else CostEstimator.from_callable(fn)
+
+
+def _targets(
+    predictor_type: PredictorTypes,
+    targets: Iterable[Target] | None,
+    rows: list,
+    params_estimator: Callable[..., float] | None,
+) -> list[Target]:
+    """The targets to predict, `targets` or by default whatever `predictor_type`
+    provides. Raises if they need the `n_params` and `n_data` that not every trial
+    reported.
+    """
+    import numpy as np
+
+    from extrapolaw.prediction import PredictorTypes, Target
+
+    is_gp = predictor_type == PredictorTypes.GP_POSTERIOR
+    missing = sum(not (np.isfinite(r[0]) and np.isfinite(r[1])) for r in rows)
+    if targets is None:
+        has_coarse = params_estimator is not None if is_gp else missing == 0
+        targets = [
+            t
+            for t in Target
+            if t in predictor_type.provides and (t != Target.COARSE or has_coarse)
+        ]
+    targets = list(targets)
+    # Every fit but the GP posterior's is on the model size and data of the trials
+    needs_scale = not is_gp and (
+        predictor_type == PredictorTypes.CHINCHILLA3 or Target.COARSE in targets
+    )
+    if needs_scale and missing:
+        raise ValueError(
+            f"'{predictor_type.value}' needs the model size and data of every trial,"
+            f" but {missing} of the {len(rows)} successful trials have no `n_params`"
+            " or `n_data` at the top level of their report.yaml. Return them from"
+            " `evaluate_pipeline`."
+        )
+    return targets
 
 
 def _target_costs(
@@ -875,17 +920,19 @@ def _save_predictions(
     predictor: str,
     target_costs: dict[str, list[float]],
     space: SearchSpace | None,
+    estimators: Estimators | None = None,
 ) -> None:
     """Save `target_costs` to `summary/targets.json`, and the scaling plots,
-    predictions and convergence at them.
+    predictions and convergence at them. The GP posterior plots need the cost
+    estimator of `estimators`.
     """
     from extrapolaw.optimizers.optimizer import Artifact, ArtifactType
     from extrapolaw.plot.scaling_plots import plot_convergence, plot_scaling
 
     try:
         artifacts = [Artifact("targets", target_costs, ArtifactType.JSON)]
-        artifacts += plot_scaling(trials, predictor, target_costs, space)
-        artifacts += plot_convergence(trials, predictor, target_costs)
+        artifacts += plot_scaling(trials, predictor, target_costs, space, estimators)
+        artifacts += plot_convergence(trials, predictor, target_costs, space, estimators)
         SummaryWriter(root_directory=root_directory).write(artifacts)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Could not save the predictions: {e}")

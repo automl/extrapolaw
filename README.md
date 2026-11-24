@@ -50,34 +50,24 @@ pip install extrapolaw
 
 Using `extrapolaw` is based on the following pattern:
 
-1. Define an `evaluate_pipeline` function that submits a training job for one configuration; the job reports its result back with `extrapolaw.save_pipeline_results()`.
 1. Define a `pipeline_space` of the parameters to search, marking those that scale the compute with `is_compute_scaling=True`.
-1. Call `extrapolaw.acquire()` with a `cost_estimator` and a cost budget to acquire data under a cost constraint.
+1. Call `extrapolaw.acquire()` with a `cost_estimator` and a cost budget to acquire data under a cost constraint. With `is_async=True` it only samples the configurations; train each one as a job, which reports its result back with `extrapolaw.save_pipeline_results()`. Without it, pass an `evaluate_pipeline` function that trains a configuration and returns its result.
 1. Call `extrapolaw.predict()` to extrapolate the results to the target scale(s).
 
 In code, the usage pattern can look like this:
 
 ```python
 import subprocess
+from pathlib import Path
+
+import yaml
 
 import extrapolaw
 
-ROOT_DIRECTORY = "path/to/save/results"  # Replace with the actual path
+ROOT_DIRECTORY = Path("path/to/save/results")  # Replace with the actual path
 
 
-# 1. Submit one configuration as a multi-GPU job and return immediately (async)
-def evaluate_pipeline(pipeline_id: str, **config):  # Extrapolaw injects `pipeline_id`
-    args = " ".join(f"--{name} {value}" for name, value in config.items())
-    subprocess.run(
-        f"sbatch --gpus=8 --wrap='torchrun --nproc_per_node=8 train.py "
-        f"--pipeline_id {pipeline_id} --root_directory {ROOT_DIRECTORY} {args}'",
-        shell=True,
-        check=True,
-    )
-    return None  # The job reports its result itself, see train.py below
-
-
-# 2. Define the search space; the names match the arguments of the training job
+# 1. Define the search space; the names match the arguments of the training job
 class LMSpace(extrapolaw.PipelineSpace):
     lr = extrapolaw.Float(lower=1e-4, upper=1e-2, log=True, prior=3e-4)
     batch_size = extrapolaw.Integer(lower=64, upper=1024, log=True, log_base=2)
@@ -91,19 +81,35 @@ def estimate_flops(width: int, n_layers: int, n_tokens: int) -> float:
     return 6 * (12 * n_layers * width**2) * n_tokens
 
 
-# 3. Acquire data under the cost constraint
+# 2. Acquire data under the cost constraint: sample a round of configurations
 extrapolaw.acquire(
-    evaluate_pipeline=evaluate_pipeline,
     pipeline_space=LMSpace(),
     root_directory=ROOT_DIRECTORY,
     cost_estimator=estimate_flops,  # Cost of every configuration
     max_cost_per_config=1e19,  # Never sample a configuration costing more than this
     total_cost_to_spend=1e20,  # Budget for the whole search
-    is_async=True,  # Keep sampling while earlier jobs are still running
-    live_plots=True,  # Update the data-acquisition plots during the run
+    is_async=True,  # Only sample, the jobs below train the configurations
+    worker_evaluations_to_spend=8,  # Configurations in this round
 )
 
-# 4. Predict the optimal performance and configuration at the target scale(s)
+# 3. Train every new configuration as a multi-GPU job, which reports its result itself
+for config_dir in sorted((ROOT_DIRECTORY / "configs").glob("config_*")):
+    submitted = config_dir / "submitted"
+    if submitted.exists():
+        continue
+    config = yaml.safe_load((config_dir / "config.yaml").read_text())
+    args = " ".join(f"--{name} {value}" for name, value in config.items())
+    pipeline_id = config_dir.name.removeprefix("config_")
+    subprocess.run(
+        f"sbatch --gpus=8 --wrap='torchrun --nproc_per_node=8 train.py "
+        f"--pipeline_id {pipeline_id} --root_directory {ROOT_DIRECTORY} {args}'",
+        shell=True,
+        check=True,
+    )
+    submitted.touch()
+
+# 4. Once the jobs have reported, predict the optimal performance and configuration
+#    at the target scale(s)
 predictions = extrapolaw.predict(
     root_directory=ROOT_DIRECTORY,
     target_costs=[1e22, 1e23],
@@ -138,6 +144,18 @@ if is_main_process():
 See the [`evaluate_pipeline`](https://automl.github.io/extrapolaw/latest/reference/evaluate_pipeline/) reference for the full asynchronous workflow.
 
 ## Resources to Get Started
+
+### Tutorial
+
+The [Extrapolaw Demo](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb) is a basic demo of what Extrapolaw can do, on a TabPFN surrogate benchmark that runs on a CPU in a few minutes. It covers:
+
+- **The basic pipeline:** define the `evaluate_pipeline` and the search space, acquire runs within a FLOP budget, and predict the loss and the compute-optimal config at a larger target compute.
+- **Visualization:** the scaling plots and the predictions that Extrapolaw writes for the loss and the downstream metrics.
+- **Parallelisation of the runs:** several workers sharing one FLOP budget, and asynchronous multi-GPU jobs.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/automl/extrapolaw/blob/master/tutorials/extrapolaw_demo.ipynb)
+
+To run it locally instead, see the [tutorials folder](tutorials/).
 
 ### Examples
 

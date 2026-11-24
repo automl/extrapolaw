@@ -1,6 +1,7 @@
 """Shared dataset/model for OpenCLIP example"""
 
 import contextlib
+import functools
 import io
 import os
 import tarfile
@@ -470,3 +471,18 @@ def get_model_flops(model, batch_size=1):
     model.train(was_training)
 
     return sum(flop_counter.get_flop_counts()["Global"].values()) / batch_size
+
+
+@functools.cache
+def model_stats(width, layers):
+    """The parameter count and training FLOPs per sample of a config whose towers
+    share `width` and `layers`.
+
+    Measured on the meta device, so nothing is allocated. Sampling (the cost
+    estimator) and training both use it, so the cost a run reports is the cost it was
+    sampled with. A backward pass costs about twice the forward pass.
+    """
+    with torch.device("meta"):
+        model = build_model(width, layers, width, layers)
+    return float(count_params(model)), 3.0 * float(get_model_flops(model))
+

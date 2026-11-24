@@ -210,3 +210,25 @@ class TestExtrapolawGridSearch:
         )
         configs = result.configs_list
         assert len(configs) == 6
+
+
+def _evaluate(x: int) -> dict:
+    return {"objective_to_minimize": float(x), "cost": 1.0}
+
+
+def test_exhausted_grid_stops_the_worker(tmp_path) -> None:
+    import extrapolaw
+
+    class Space(PipelineSpace):
+        x = Integer(0, 2)
+
+    # More evaluations allowed than the grid holds, the worker stops at the end of it
+    extrapolaw.acquire(
+        evaluate_pipeline=_evaluate,
+        pipeline_space=Space(),
+        root_directory=tmp_path / "grid",
+        optimizer=("grid_search", {"size_per_numerical_dimension": 3}),
+        total_evaluations_to_spend=10,
+    )
+    full, _ = extrapolaw.status(tmp_path / "grid")
+    assert len(full) == 3

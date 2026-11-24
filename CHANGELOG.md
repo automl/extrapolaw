@@ -19,11 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING:** Renamed `extrapolaw.run()` to `extrapolaw.acquire()`.
+- **BREAKING:** `extrapolaw.acquire()` uses `random_search` without an `optimizer`, instead of `"auto"`. Pass `optimizer="auto"` to choose the optimizer from the space, or to continue a run with the optimizer it was started with.
+- **BREAKING:** `extrapolaw.acquire(is_async=True)` only samples configurations and takes no `evaluate_pipeline` (it must be `None`); launch a job for each `configs/config_<id>/config.yaml` and report its result with `extrapolaw.save_pipeline_results()`. Without `is_async`, `evaluate_pipeline` is required, and returning `None` from it raises a `ValueError`.
 - **BREAKING:** `evaluate_pipeline` must return a dictionary with `objective_to_minimize` and the training `cost`, unless a `cost_estimator` provides the cost.
 - **BREAKING:** Forked from NePS 0.17.0 and renamed the package `neps` → `extrapolaw` (PyPI package, import name, CLI, `EXTRAPOLAW_*` env vars, optimizer names, default result dirs, examples in `extrapolaw_examples/`).
 - `bayesian_optimization` passes the space's constants to `constraints_func`, like `random_search` does.
 - **BREAKING:** The summary no longer has `best_config.txt`, `best_config_trajectory.txt`, `short.csv` and the incumbent trajectory, and the scaling data is no longer logged to TensorBoard.
 - `optimizer="auto"` picks `bayesian_optimization` for a space without priors and fidelities, `random_search` otherwise (sampling from the priors), and `complex_random_search` for a space that cannot be converted to a classic one. A fidelity is set to its maximum as it's not used in any optimizer for now.
+
+### Fixed
+- Workers started together on a new `root_directory` no longer crash with `EOFError` reading a half-written `optimizer_state.pkl`: the state files are replaced whole, and `optimizer_info.yaml` is written last.
 
 ### Removed
 - **BREAKING:** The HPO optimizers that scaling studies do not use: `successive_halving`, `hyperband`, `mo_hyperband`, `asha`, `moasha`, `async_hb`, `priorband`, `ifbo`, `pibo`, `primo`, `extrapolaw_hyperband`, `extrapolaw_priorband`, `extrapolaw_regularized_evolution` and `extrapolaw_local_and_incumbent`. `bayesian_optimization`, `random_search`, `grid_search`, `complex_random_search`, `extrapolaw_random_search`, `carbs` and `chinchilla` remain.

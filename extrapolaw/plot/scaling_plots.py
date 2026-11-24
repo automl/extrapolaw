@@ -9,7 +9,8 @@ from __future__ import annotations
 import logging
 import shutil
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,6 +46,29 @@ DEFAULT_TARGETS = [10, 100]
 TENSORBOARD_LOCK_TIMEOUT = 5.0
 """Seconds to wait for another worker logging to TensorBoard, before trying again at
 the next update."""
+NUM_FIT_POINTS = 60
+"""Costs the fit is drawn at, between the cheapest run and the largest target."""
+NUM_GP_FIT_POINTS = 15
+"""The same for the GP posterior, which takes a search over configs per cost."""
+
+
+@dataclass
+class Estimators:
+    """The parameter count and cost of a config, as given to `extrapolaw.predict()`."""
+
+    params: Callable[..., float] | None = None
+    cost: Callable[..., float] | None = None
+
+
+def _law(predictor: str, cost: str, estimators: Estimators | None) -> str:
+    """The scaling law to fit over `cost`: `predictor` over the training cost, if it
+    can be fitted, and a power law otherwise. The GP posterior needs a cost estimator.
+    """
+    if cost != "cost":
+        return "power_law"
+    if predictor == "gp_posterior" and (estimators is None or estimators.cost is None):
+        return "power_law"
+    return predictor
 
 
 def _is_higher_better(metric: str) -> bool:
@@ -141,10 +165,13 @@ def predict_over(
     costs: Sequence[float],
     targets: Sequence[Target],
     space: SearchSpace | None = None,
+    estimators: Estimators | None = None,
 ) -> pd.DataFrame:
     """What the scaling law `law`, fitted on `metric` over `cost` of `runs`, predicts
     for `targets` at each of `costs`: the metric, the model size and data, and with
     the search space `space` the config. What it cannot predict is left out.
+    `estimators` are the parameter count and cost of a config, which the GP posterior
+    needs.
 
     Over the inference cost, the data is the most any run used, since more data does
     not make a model more expensive to run.
@@ -166,6 +193,8 @@ def predict_over(
                 rows=rows,
                 configs=configs,
                 space=space,
+                params_estimator=None if estimators is None else estimators.params,
+                cost_estimator=None if estimators is None else estimators.cost,
             )
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Could not fit '{law}' on {metric} over {cost}: {e}")
@@ -191,15 +220,19 @@ def _draw_fit(
     largest_run: float,
     label: str,
 ) -> None:
-    """The fit of `column`, solid over the runs and dashed beyond the largest one, its
-    predictions at the target costs, and the extrapolation region shaded.
+    """The fit of `column`, solid over the runs and dashed beyond the largest one, if
+    it is drawn there, its predictions at the target costs, and the extrapolation
+    region shaded.
     """
     line = fit[~fit["target"]]
     inside = line[line[cost] <= largest_run]
     beyond = line[line[cost] >= inside[cost].max()]
     targets = fit[fit["target"]]
     ax.plot(inside[cost], inside[column], color=INK, linewidth=2, label=label)
-    ax.plot(beyond[cost], beyond[column], color=INK, linewidth=2, linestyle=(0, (4, 3)))
+    if len(beyond) > 1:
+        ax.plot(
+            beyond[cost], beyond[column], color=INK, linewidth=2, linestyle=(0, (4, 3))
+        )
     ax.scatter(
         targets[cost],
         targets[column],
@@ -254,12 +287,13 @@ def plot_loss_over_cost(
     if loss in fit:
         _draw_fit(ax, fit, cost, loss, runs[cost].max(), label)
         targets = fit[fit["target"]]
-        for x, y in zip(targets[cost], targets[loss], strict=True):
+        for i, (x, y) in enumerate(zip(targets[cost], targets[loss], strict=True)):
+            # Above and below in turn, so the labels of close targets do not overlap
             ax.annotate(
                 f"{y:.3g}",
                 (x, y),
                 textcoords="offset points",
-                xytext=(8, 6),
+                xytext=(8, 6) if i % 2 == 0 else (8, -16),
                 color=INK,
                 fontweight="bold",
             )
@@ -340,15 +374,17 @@ def plot_scaling(
     predictor: str = "power_law",
     targets: Mapping[str, Sequence[float]] | None = None,
     space: SearchSpace | None = None,
+    estimators: Estimators | None = None,
 ) -> list[Artifact]:
     """The scaling plots and predictions of the loss and of each downstream metric,
     over the cost and, if reported, the inference cost, if any successful run reports
     a cost.
 
     Over the cost, the fit is `predictor`, the scaling law of the run's optimizer, and
-    over the inference cost a power law, both for what `predictor` can predict. They
-    are extended to `targets`, the target costs by cost, `DEFAULT_TARGETS` times the
-    largest cost of the runs by default.
+    over the inference cost a power law, each for what it can predict. They are
+    extended to `targets`, the target costs by cost, `DEFAULT_TARGETS` times the
+    largest cost of the runs by default. The GP posterior needs the cost estimator of
+    `estimators`, without it the fit is a power law.
     """
     from extrapolaw.prediction import Target, get_predictor_type
 
@@ -369,7 +405,6 @@ def plot_scaling(
             continue
         parameters.append(parameter)
 
-    provides = [t for t in Target if t in get_predictor_type(predictor).provides]
     configs = {trial.id: dict(trial.config) for trial in trials}
     artifacts = []
     for metric in ["loss", *downstream]:
@@ -377,10 +412,17 @@ def plot_scaling(
         for cost in costs:
             runs = _with_frontier(table, cost, metric)
             target_costs = _targets(table, cost, targets)
-            xs = list(np.geomspace(runs[cost].min(), max(target_costs), 60))
-            law = predictor if cost == "cost" else "power_law"
+            law = _law(predictor, cost, estimators)
+            provides = [t for t in Target if t in get_predictor_type(law).provides]
+            if law == "gp_posterior":
+                # Each GP point is its own search over configs, so the curve beyond
+                # the runs would be noise, not a trend: draw it over the runs only.
+                num, end = NUM_GP_FIT_POINTS, runs[cost].max()
+            else:
+                num, end = NUM_FIT_POINTS, max(target_costs)
+            xs = list(np.geomspace(runs[cost].min(), end, num))
             fit = predict_over(
-                runs, metric, cost, law, xs + target_costs, provides, space
+                runs, metric, cost, law, xs + target_costs, provides, space, estimators
             )
             fit["target"] = [False] * len(xs) + [True] * len(target_costs)
             label = f"{law} fit"
@@ -487,10 +529,13 @@ def plot_convergence(
     trials: Sequence[Trial],
     predictor: str,
     targets: Mapping[str, Sequence[float]] | None = None,
+    space: SearchSpace | None = None,
+    estimators: Estimators | None = None,
 ) -> list[Artifact]:
     """For the loss and each downstream metric, over each cost, the prediction at the
     target costs as the runs finished, refitted at most 20 times, to see whether it has
-    settled. Saved to `convergence/`, with the fits of `plot_scaling`.
+    settled. Saved to `convergence/`, with the fits of `plot_scaling`, for which the
+    GP posterior needs `space` and the cost estimator of `estimators`.
     """
     from extrapolaw.prediction import Target
 
@@ -504,11 +549,22 @@ def plot_convergence(
     for metric in ["loss", *downstream]:
         for cost in _costs(table):
             target_costs = _targets(table, cost, targets)
-            law = predictor if cost == "cost" else "power_law"
+            law = _law(predictor, cost, estimators)
+            if law == "gp_posterior" and space is None:
+                law = "power_law"
             history = []
             for n in sorted({int(n) for n in np.linspace(3, len(table), 20)}):
                 runs = table.iloc[:n].dropna(subset=[metric, cost])
-                fit = predict_over(runs, metric, cost, law, target_costs, [Target.LOSS])
+                fit = predict_over(
+                    runs,
+                    metric,
+                    cost,
+                    law,
+                    target_costs,
+                    [Target.LOSS],
+                    space,
+                    estimators,
+                )
                 if metric in fit:
                     fit["cost_spent"] = table["cost"].iloc[:n].sum()
                     history.append(fit.rename(columns={cost: f"target_{cost}"}))
