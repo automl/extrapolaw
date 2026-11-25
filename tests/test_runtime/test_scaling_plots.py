@@ -195,3 +195,27 @@ def test_predict_saves_the_targets_and_the_convergence(tmp_path: Path) -> None:
     for name in ("loss_over_cost", "loss_over_inference_cost", "task_acc_over_cost"):
         assert (summary / "convergence" / f"{name}.png").exists()
     assert len(pd.read_csv(summary / "convergence/loss_over_cost.csv")) > 0
+
+
+def test_rounded_fit_draws_the_rounded_config() -> None:
+    runs = pd.DataFrame(
+        {"cost": [1.0, 10.0], "width": [8, 16], "loss": [2.0, 1.0], "on_frontier": True}
+    )
+    fit = pd.DataFrame(
+        {
+            "cost": [1.0, 10.0, 100.0],
+            "width": [8, 16, 32],
+            "width_fit": [9.0, 15.0, 27.0],
+            "target": [False, False, True],
+        }
+    )
+    for rounded, ys, label in (
+        (False, [9.0, 15.0], "power_law fit"),
+        (True, [8, 16], "rounded power_law fit"),
+    ):
+        figure = scaling_plots.plot_parameter_over_cost(
+            runs, "width", "cost", fit, "power_law fit", rounded
+        )
+        line = figure.axes[0].lines[0]
+        assert list(line.get_ydata()) == ys
+        assert line.get_label() == label

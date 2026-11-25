@@ -731,6 +731,7 @@ def predict(
     cost_estimator: Callable[..., float] | None = None,
     seed: int = 0,
     cache_dir: str | Path | None = None,
+    rounded_fit: bool = False,
 ) -> list[Prediction]:
     """Extrapolate the evaluated trials of a run to larger compute budgets.
 
@@ -770,6 +771,9 @@ def predict(
             the cost of the configs it considers, which it needs.
         seed: Seed of the `"gp_posterior"` candidate pool.
         cache_dir: Where `"gp_posterior"` checkpoints its fit and predictions.
+        rounded_fit: Draw the power-law fits in the parameter plots rounded to the
+            search space, as steps, instead of as straight lines. The predictions
+            are rounded either way.
 
     Returns:
         One [`Prediction`][scalefm.prediction.Prediction] per target budget.
@@ -844,6 +848,7 @@ def predict(
         costs_by_kind,
         space,
         Estimators(params=params_estimator, cost=cost_estimator),
+        rounded_fit=rounded_fit,
     )
     return predictions
 
@@ -920,6 +925,8 @@ def _save_predictions(
     target_costs: dict[str, list[float]],
     space: SearchSpace | None,
     estimators: Estimators | None = None,
+    *,
+    rounded_fit: bool = False,
 ) -> None:
     """Save `target_costs` to `summary/targets.json`, and the scaling plots,
     predictions and convergence at them. The GP posterior plots need the cost
@@ -930,7 +937,9 @@ def _save_predictions(
 
     try:
         artifacts = [Artifact("targets", target_costs, ArtifactType.JSON)]
-        artifacts += plot_scaling(trials, predictor, target_costs, space, estimators)
+        artifacts += plot_scaling(
+            trials, predictor, target_costs, space, estimators, rounded_fit
+        )
         artifacts += plot_convergence(trials, predictor, target_costs, space, estimators)
         SummaryWriter(root_directory=root_directory).write(artifacts)
     except Exception as e:  # noqa: BLE001
