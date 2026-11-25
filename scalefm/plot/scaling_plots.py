@@ -386,6 +386,7 @@ def plot_scaling(
     table = runs_table(trials)
     if table.empty:
         return []
+    logger.info(f"Fitting {_law(predictor, 'cost', estimators)} for the scaling plots")
 
     downstream = [c for c in table.columns if c.startswith("downstream/")]
     costs = _costs(table)

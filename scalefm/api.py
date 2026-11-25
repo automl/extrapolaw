@@ -621,10 +621,10 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
     root_directory = Path(root_directory)
     SummaryWriter.from_directory(root_directory, live_plots=live_plots).update(final=True)
     summary_dir = root_directory / "summary"
-    logger.info(
-        "The summary folder has been created, with full.csv (all runs) and the plots."
-        f"\nYou can find summary folder at: {summary_dir}."
-    )
+    if live_plots:
+        logger.info(f"The summary with full.csv and the plots is at: {summary_dir}")
+    else:
+        logger.info(f"The summary with full.csv is at: {summary_dir}.")
 
 
 def _sample_only(**_: Any) -> Any:
@@ -822,6 +822,7 @@ def predict(
         )
 
     costs_by_kind = _target_costs(rows, target_costs, target_inference_costs)
+    logger.info(f"Fitting {predictor_type.value} to predict at the target costs")
     predictions = fit_and_predict(
         predictor_type,
         costs_by_kind["cost"],
