@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `scalefm.predict(rounded_fit=True)` draws the power-law fits in the parameter plots rounded to the search space, as steps.
+
 ## [0.2.0] - 2026-11-25
 
 ### Added
@@ -19,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The scaling plots are per task, in `summary/pre_train/` and `summary/downstream/<name>/`, with the fit extended to the target costs, the Pareto front and the predictions as CSV files, and parameter plots with what the fit predicts for each parameter.
 - `scalefm.predict()` predicts at 10 and 100 times the largest cost of the runs by default, takes `target_inference_costs`, and saves the target costs to `summary/targets.json` and how the predictions converged to `summary/convergence/`.
 - An LLM pre-training scaling study as a real-world example with asynchronous evaluation, training each config on up to 4 GPUs.
+
 
 ### Changed
 - **BREAKING:** Renamed `scalefm.run()` to `scalefm.acquire()`.

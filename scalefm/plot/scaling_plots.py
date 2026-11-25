@@ -209,10 +209,11 @@ def predict_over(
         else:
             for name in names:
                 predicted[name] = [p.config[name] for p in predictions]  # type: ignore[index]
-                predicted[f"{name}_fit"] = [
-                    p.info[target]["fitted_config"][name]  # type: ignore[index]
-                    for p in predictions
-                ]
+                if law == "power_law":
+                    predicted[f"{name}_fit"] = [
+                        p.info[target]["fitted_config"][name]  # type: ignore[index]
+                        for p in predictions
+                    ]
     return predicted
 
 
@@ -223,19 +224,29 @@ def _draw_fit(
     column: str,
     largest_run: float,
     label: str,
+    rounded: bool = False,  # noqa: FBT001, FBT002
 ) -> None:
     """The fit of `column`, solid over the runs and dashed beyond the largest one, if
     it is drawn there, its predictions at the target costs, and the extrapolation
-    region shaded.
+    region shaded. A prediction rounded to the search space is joined to the fit by a
+    thin line, or with `rounded` the fit is drawn rounded too.
     """
     line = fit[~fit["target"]]
     inside = line[line[cost] <= largest_run]
     beyond = line[line[cost] >= inside[cost].max()]
     targets = fit[fit["target"]]
     y = f"{column}_fit" if f"{column}_fit" in fit else column
+    if rounded and y != column:
+        y, label = column, f"rounded {label}"
     ax.plot(inside[cost], inside[y], color=INK, linewidth=2, label=label)
     if len(beyond) > 1:
         ax.plot(beyond[cost], beyond[y], color=INK, linewidth=2, linestyle=(0, (4, 3)))
+    prediction = "Prediction"
+    if y != column:
+        ax.vlines(
+            targets[cost], targets[y], targets[column], color=AXIS_COLOR, linewidth=1
+        )
+        prediction = "Prediction (rounded)"
     ax.scatter(
         targets[cost],
         targets[column],
@@ -244,7 +255,7 @@ def _draw_fit(
         edgecolors="white",
         linewidths=1.5,
         zorder=4,
-        label="Prediction",
+        label=prediction,
     )
     ax.set(xscale="log", yscale="log")
     xmin, xmax = ax.get_xlim()
@@ -307,10 +318,16 @@ def plot_loss_over_cost(
 
 
 def plot_parameter_over_cost(
-    runs: pd.DataFrame, parameter: str, cost: str, fit: pd.DataFrame, label: str
+    runs: pd.DataFrame,
+    parameter: str,
+    cost: str,
+    fit: pd.DataFrame,
+    label: str,
+    rounded: bool = False,  # noqa: FBT001, FBT002
 ) -> Figure:
     """One parameter of every run over its `cost`, coloured by loss, with the runs on
-    the Pareto frontier circled and what the fit `label` predicts for it, if it can.
+    the Pareto frontier circled and what the fit `label` predicts for it, if it can,
+    with `rounded` drawn rounded to the search space.
     """
     front = runs[runs["on_frontier"]]
     cost_label = cost.replace("_", " ")
@@ -329,7 +346,7 @@ def plot_parameter_over_cost(
         label="Pareto frontier",
     )
     if parameter in fit:
-        _draw_fit(ax, fit, cost, parameter, runs[cost].max(), label)
+        _draw_fit(ax, fit, cost, parameter, runs[cost].max(), label, rounded)
     ax.set(xscale="log", yscale="log")
     _style(ax, f"{parameter} over {cost_label}", cost_label.capitalize(), parameter)
     fig.colorbar(points, ax=ax, label="Loss")
@@ -370,6 +387,7 @@ def plot_scaling(
     targets: Mapping[str, Sequence[float]] | None = None,
     space: SearchSpace | None = None,
     estimators: Estimators | None = None,
+    rounded_fit: bool = False,  # noqa: FBT001, FBT002
 ) -> list[Artifact]:
     """The scaling plots and predictions of the loss and of each downstream metric,
     over the cost and, if reported, the inference cost, if any successful run reports
@@ -379,7 +397,8 @@ def plot_scaling(
     over the inference cost a power law, each for what it can predict. They are
     extended to `targets`, the target costs by cost, `DEFAULT_TARGETS` times the
     largest cost of the runs by default. The GP posterior needs the cost estimator of
-    `estimators`, without it the fit is a power law.
+    `estimators`, without it the fit is a power law. With `rounded_fit`, the power-law
+    fits of the parameters are drawn rounded to the search space.
     """
     from scalefm.prediction import Target, get_predictor_type
 
@@ -442,7 +461,9 @@ def plot_scaling(
                 )
             for parameter in parameters:
                 name = f"{folder}/parameters/{parameter.replace('.', '_')}_over_{cost}"
-                figure = plot_parameter_over_cost(runs, parameter, cost, fit, label)
+                figure = plot_parameter_over_cost(
+                    runs, parameter, cost, fit, label, rounded_fit
+                )
                 artifacts.append(Artifact(name, figure, ArtifactType.FIGURE))
     return artifacts
 
