@@ -35,6 +35,19 @@ class MySpace(scalefm.PipelineSpace):
 
     For more details on how to use the `scalefm.acquire()` function, see the [ScaleFM Run Reference](../reference/scalefm_acquire.md).
 
+### Marking the **compute-scaling** Parameters
+
+In a scaling study, mark the parameters that set the compute of a configuration, e.g. the model width, the number of layers or the training tokens, with `is_compute_scaling=True`:
+
+```python
+class MySpace(scalefm.PipelineSpace):
+    width = scalefm.Integer(lower=64, upper=1024, log=True, is_compute_scaling=True)
+    n_layers = scalefm.Integer(lower=2, upper=24, is_compute_scaling=True)
+    learning_rate = scalefm.Float(lower=1e-5, upper=1e-1, log=True)
+```
+
+The [`cost_estimator`](scalefm_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration) usually computes the cost of a configuration from them, and [Chinchilla](optimizers.md#32-chinchilla-guided-scaling) lays out its configurations along them: all of them except `data_parameter_name` make up the model size.
+
 ### Providing a **Fidelity** Parameter
 
 You can use [`scalefm.IntegerFidelity`][scalefm.space.scalefm_spaces.parameters.IntegerFidelity] or [`scalefm.FloatFidelity`][scalefm.space.scalefm_spaces.parameters.FloatFidelity] to mark a parameter that sets how much is spent on an evaluation, e.g. the number of epochs. The optimizers set it to its maximum or treat it like any other parameter, see `ignore_fidelity`:

@@ -82,50 +82,53 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
         | Literal["auto"]
     ) = "random_search",
 ) -> None:
-    """Run the optimization.
+    """Acquire the data of a scaling study: sample configurations and evaluate them.
+
+    Configurations are sampled within a cost budget and evaluated with
+    `evaluate_pipeline`, or, with `is_async=True`, only sampled for jobs that report
+    their results with `scalefm.save_pipeline_results()`. Fit and extrapolate the
+    results afterwards with [`scalefm.predict()`][scalefm.api.predict].
 
     !!! tip "Parallelization"
 
         To run with multiple processes or machines, execute the script that
         calls `scalefm.acquire()` multiple times. They will keep in sync using
-        the file-sytem, requiring that `root_directory` be shared between them.
+        the file system, requiring that `root_directory` be shared between them.
 
 
     ```python
     import scalefm
-    import logging
 
-    logging.basicConfig(level=logging.INFO)
 
-    def evaluate_pipeline(some_parameter: float) -> float:
-        validation_error = -some_parameter
-        return validation_error
+    def estimate_flops(width: int, n_layers: int, n_tokens: int) -> float:
+        return 6 * (12 * n_layers * width**2) * n_tokens
 
-    class MySpace(PipelineSpace):
-        dataset = "mnist"               # constant
-        nlayers = scalefm.Integer(2,10)    # integer
-        alpha = scalefm.Float(0.1, 1.0)    # float
-        optimizer = scalefm.Categorical(   # categorical
-            ("adam", "sgd", "rmsprop")
-        )
-        learning_rate = scalefm.Float(     # log spaced float
-            lower=1e-5, upper=1, log=True
-        )
-        epochs =                        # fidelity integer
-            scalefm.IntegerFidelity(1, 100)
-        batch_size = scalefm.Integer(      # integer with a prior
-            lower=32,
-            upper=512,
-            prior=128,
-            prior_confidence="medium"
-        )
+
+    def evaluate_pipeline(lr: float, width: int, n_layers: int, n_tokens: int) -> dict:
+        model = build_model(width=width, n_layers=n_layers)
+        val_loss = train_and_eval(model, lr=lr, n_tokens=n_tokens)
+        return {
+            "objective_to_minimize": val_loss,
+            "cost": estimate_flops(width, n_layers, n_tokens),  # Training FLOPs
+        }
+
+
+    class MySpace(scalefm.PipelineSpace):
+        lr = scalefm.Float(lower=1e-4, upper=1e-2, log=True)
+        width = scalefm.Integer(64, 1024, log=True, is_compute_scaling=True)
+        n_layers = scalefm.Integer(2, 12, is_compute_scaling=True)
+        n_tokens = scalefm.Integer(10**7, 10**9, log=True, is_compute_scaling=True)
+
 
     scalefm.acquire(
         evaluate_pipeline=evaluate_pipeline,
         pipeline_space=MySpace(),
-        root_directory="usage_example",
-        worker_evaluations_to_spend=5,
+        root_directory="results",
+        cost_estimator=estimate_flops,  # The cost of a configuration before training
+        max_cost_per_config=1e16,  # The most a single configuration may cost
+        total_cost_to_spend=1e17,  # The budget of the whole study
     )
+    predictions = scalefm.predict("results")
     ```
 
     Args:
@@ -178,8 +181,9 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 learning_rate = scalefm.Float(     # log spaced float
                     lower=1e-5, upper=1, log=True
                 )
-                epochs =                        # fidelity integer
-                    scalefm.IntegerFidelity(1, 100)
+                width = scalefm.Integer(           # scales the compute
+                    64, 1024, log=True, is_compute_scaling=True
+                )
                 batch_size = scalefm.Integer(      # integer with a prior
                     lower=32,
                     upper=512,
@@ -198,6 +202,8 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
             Some important properties you can set on parameters are:
 
+            * `is_compute_scaling=True`: Marks a parameter that sets the compute of a
+                configuration, e.g. the model width or the number of training tokens.
             * `prior=`: If you have a good idea about what a good setting
                 for a parameter may be, you can set this as the prior for
                 a parameter. You specify this along with `prior_confidence`
@@ -234,9 +240,9 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
             If true, stop only after worker_evaluations_to_spend have fully completed. In other words,
             pipelines that are still running do not count toward the stopping criterion.
 
-        worker_cost_to_spend: No new evaluations will start when this cost is exceeded. Requires
-            returning a cost in the evaluate_pipeline function, e.g.,
-            `return dict(loss=loss, cost=cost)`.
+        worker_cost_to_spend: No new evaluations will start when this cost is exceeded.
+            Requires a `cost` in the result of `evaluate_pipeline`, or a
+            `cost_estimator`.
 
         total_evaluations_to_spend: Maximum number of evaluations across all workers
             sharing the same ScaleFM run. Once this total is reached, no worker will start
@@ -311,8 +317,8 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 quickly.
 
         live_plots: If `True`, refresh the plots in the `summary` folder after every
-            evaluated trial: the scaling plots, or the Pareto front for two
-            objectives, plus any artifacts the optimizer provides. Off by default, as plotting adds overhead to every evaluation.
+            evaluated trial: the scaling plots, plus any artifacts the optimizer
+            provides. Off by default, as plotting adds overhead to every evaluation.
 
         worker_id: An optional string to identify the worker (run instance).
             If not provided, a `worker_id` will be automatically generated using the pattern:
@@ -672,20 +678,20 @@ def save_pipeline_results(
     *,
     live_plots: bool = False,
 ) -> None:
-    """Persist the outcome of one pipeline evaluation.
+    """Report the result of a configuration that was trained outside of ScaleFM.
+
+    Used with `scalefm.acquire(is_async=True)`: the job that trained
+    `configs/config_<id>/config.yaml` calls this once, when it finishes.
 
     Args:
-        user_result (dict): Dictionary returned by evaluate_pipeline. Must
-            contain keys required by _save_results (e.g. "cost",
-            "objective_to_minimize", optional "learning_curve", "exception",
-            "info_dict").
-        pipeline_id (str): Unique identifier of the pipeline/trial whose
-            result is being stored. Used to locate the corresponding
-            scalefm.core.trial.Trial object inside the optimisation state.
-        root_directory (str | Path): Root directory of the ScaleFM run (contains
-            optimizer_info.yaml and configs/ folder).
-        live_plots (bool): Whether to also refresh the summary plots.
-
+        user_result: The result, with the same
+            [keys](../../reference/evaluate_pipeline.md#2-result-dictionary-keys)
+            `evaluate_pipeline` returns. For a failed job, pass
+            `{"exception": e, "objective_to_minimize": None}`.
+        pipeline_id: The id of the configuration, the `<id>` in
+            `configs/config_<id>`.
+        root_directory: Root directory of the ScaleFM run.
+        live_plots: Whether to also refresh the scaling plots in `summary/`.
     """
     root_directory = Path(root_directory)
     _save_results(
@@ -704,9 +710,9 @@ def save_pipeline_results(
 
 
 def analyze(root_directory: str | Path) -> None:
-    """Rebuilds the trial evaluation summaries
-    including the best-config text files, the plots and the optimizer's
-    own artifacts, without evaluating anything.
+    """Rebuild the `summary` folder of a run without evaluating anything.
+
+    Writes `full.csv`, the scaling plots and the optimizer's own artifacts.
 
     Args:
         root_directory: Root directory of the ScaleFM run
@@ -776,7 +782,9 @@ def predict(
             are rounded either way.
 
     Returns:
-        One [`Prediction`][scalefm.prediction.Prediction] per target budget.
+        One `Prediction` per target budget, with its `target_cost` and the `loss`,
+            `n_params`, `n_data` and `config` predicted there. What the predictor
+            does not provide is `None`.
     """
     from scalefm.plot.scaling_plots import Estimators
     from scalefm.prediction import (
