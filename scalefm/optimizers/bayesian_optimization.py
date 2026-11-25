@@ -108,6 +108,11 @@ class BayesianOptimization(ScalingOptimizer):
     standardized outcomes, the `cost_estimator` still serving the budget schedule and
     the max cost per config."""
 
+    kernel: Literal["rbf", "scan"] = "rbf"
+    """The kernel of the numerical HPs of the GP. `"rbf"` is the ARD RBF kernel, one
+    lengthscale per HP. `"scan"` adds learned directions along which HPs vary jointly to
+    it, see `ScanKernel`."""
+
     budget_schedule: Literal["none", "space_expansion", "left_budget_contraction"] = (
         "none"
     )
@@ -629,8 +634,13 @@ class BayesianOptimization(ScalingOptimizer):
                 x=data.x,
                 y=data.y,
                 encoder=encoder,
+<<<<<<< Updated upstream:scalefm/optimizers/bayesian_optimization.py
                 prior_mean="zero",
                 log_y=self.log_y,
+=======
+                y_transform=Standardize(m=data.y.shape[-1]),
+                kernel=self.kernel,
+>>>>>>> Stashed changes:extrapolaw/optimizers/bayesian_optimization.py
             )
         elif cost_estimator is None:
             logger.warning(
@@ -695,6 +705,7 @@ class BayesianOptimization(ScalingOptimizer):
                 X_pending=data.x_pending,
                 prune_baseline=True,
             )
+<<<<<<< Updated upstream:scalefm/optimizers/bayesian_optimization.py
         elif self.acquisition_func_type == "IT-JES":
             from botorch.acquisition.joint_entropy_search import qJointEntropySearch
             from botorch.acquisition.utils import get_optimal_samples
@@ -703,6 +714,73 @@ class BayesianOptimization(ScalingOptimizer):
             upper = [domain.upper for domain in encoder.domains]
             bounds = torch.tensor(
                 [lower, upper], dtype=torch.float64, device=data.x.device
+=======
+        else:
+            if self.prior_mean == "zero":
+                gp = make_single_obj_gp(
+                    x=data.x,
+                    y=data.y,
+                    encoder=encoder,
+                    prior_mean="zero",
+                    log_y=self.log_y,
+                    kernel=self.kernel,
+                )
+            elif cost_estimator is None:
+                logger.warning(
+                    "No cost estimator, the GP falls back to a constant prior mean"
+                    " instead of the power law in the cost."
+                )
+                gp = make_default_single_obj_gp(
+                    x=data.x, y=data.y, encoder=encoder, kernel=self.kernel
+                )
+            else:
+                # Fit a power law to determine GP mean prior
+                from extrapolaw.utils.power_law import fit_power_law_mean_params
+
+                completed = [
+                    (trial.config, trial.report.objective_to_minimize)
+                    for trial in trials.values()
+                    if trial.report is not None
+                    and trial.report.objective_to_minimize is not None
+                ]
+                mean_params = fit_power_law_mean_params(
+                    [config for config, _ in completed],
+                    [objective for _, objective in completed],
+                    cost_estimator,
+                )
+                if mean_params.fit is not None:
+                    logger.info(
+                        f"Fitted power law: slope={mean_params.slope:.4f}, "
+                        f"intercept={mean_params.intercept:.4f}, "
+                        f"r²={mean_params.fit.r_squared:.4f}, "
+                        f"n={mean_params.fit.num_points}"
+                    )
+                else:
+                    logger.warning(
+                        "Insufficient data for power law fit "
+                        f"({len(mean_params.flops)} trials). "
+                        f"Using default slope={mean_params.slope}, "
+                        f"intercept={mean_params.intercept}."
+                    )
+
+                gp = make_single_obj_gp(
+                    x=data.x,
+                    y=data.y,
+                    encoder=encoder,
+                    prior_mean="power_law",
+                    cost_estimator=cost_estimator,
+                    min_cost=mean_params.min_flops,
+                    mean_slope=mean_params.slope,
+                    mean_bias=mean_params.intercept,
+                    log_y=self.log_y,
+                    kernel=self.kernel,
+                )
+            from botorch.fit import fit_gpytorch_mll
+            from gpytorch import ExactMarginalLogLikelihood
+
+            fit_gpytorch_mll(
+                ExactMarginalLogLikelihood(likelihood=gp.likelihood, model=gp)
+>>>>>>> Stashed changes:extrapolaw/optimizers/bayesian_optimization.py
             )
 
             if encoded_constraints_func is None:

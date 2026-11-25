@@ -33,12 +33,14 @@ from botorch.optim.initializers import initialize_q_batch
 from botorch.optim.utils import fix_features
 from botorch.utils.sampling import draw_sobol_samples
 from gpytorch import ExactMarginalLogLikelihood
-from gpytorch.kernels import ScaleKernel
+from gpytorch.kernels import Kernel, ScaleKernel
 from gpytorch.means import (
     Mean as GpMean,
     ZeroMean,
 )
+from gpytorch.priors import LogNormalPrior, NormalPrior
 from gpytorch.utils.warnings import NumericalWarning
+from torch import nn
 
 from scalefm.exceptions import ConstraintViolationError
 from scalefm.optimizers.acquisition import (
@@ -206,7 +208,102 @@ class PowerLawMean(GpMean):
         return transformed.squeeze(-1)
 
 
-def make_default_single_obj_gp(
+#: The covariance of the numerical HPs of the GP. `"rbf"` is the ARD RBF kernel with
+#: the dimension scaled lengthscale prior, `"scan"` the `ScanKernel`.
+KernelType = Literal["rbf", "scan"]
+
+
+class ScanKernel(Kernel):
+    """An RBF kernel with the Mahalanobis metric `M = diag(lengthscale)^-2 + L L^T`.
+
+    `k(x, x') = exp(-(x - x')^T M (x - x') / 2)`, with the ARD lengthscales and a learned
+    projection `L` of shape `(d, rank)`. The diagonal is the ARD RBF kernel, the low
+    rank term adds `rank` directions along which HPs vary jointly, e.g. a learning rate
+    whose optimum shifts with the model size. A negative `M[i, j]` makes moving HPs `i`
+    and `j` together cheap, a positive one trading one off against the other.
+
+    The projection is initialized randomly around zero, at the scale of the inverse
+    lengthscales, as `L = 0` is a stationary point of the marginal likelihood the fit
+    can't leave, and a zero mean normal prior shrinks it towards the ARD RBF kernel. A
+    tighter init or prior collapses `L` to zero, i.e. to the ARD RBF kernel.
+    """
+
+    has_lengthscale = True
+
+    def __init__(
+        self,
+        ard_num_dims: int,
+        rank: int = 1,
+        *,
+        active_dims: Sequence[int] | None = None,
+        projection_prior_scale: float = 3.0,
+        projection_init_scale: float = 1.0,
+    ) -> None:
+        lengthscale_prior = LogNormalPrior(
+            loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
+        )
+        super().__init__(
+            ard_num_dims=ard_num_dims,
+            active_dims=active_dims,  # type: ignore[arg-type]
+            lengthscale_prior=lengthscale_prior,
+            # As `get_covar_module_with_dim_scaled_prior()`, for numerical stability
+            lengthscale_constraint=gpytorch.constraints.GreaterThan(
+                2.5e-2, transform=None, initial_value=lengthscale_prior.mode
+            ),
+        )
+        self.rank = rank
+        self.register_parameter(
+            "projection",
+            nn.Parameter(projection_init_scale * torch.randn(ard_num_dims, rank)),
+        )
+        self.register_prior(
+            "projection_prior",
+            NormalPrior(0.0, projection_prior_scale),
+            lambda module: module.projection,
+        )
+
+    def _features(self, x: torch.Tensor) -> torch.Tensor:
+        """`[x / lengthscale, x @ L]`, whose squared euclidean distances are the
+        Mahalanobis ones of `x` with the metric `M`."""
+        projection = self.projection.to(x)
+        return torch.cat([x.div(self.lengthscale), x @ projection], dim=-1)
+
+    def forward(  # The signature of `Kernel.forward()`
+        self,
+        x1: torch.Tensor,
+        x2: torch.Tensor,
+        diag: bool = False,  # noqa: FBT001, FBT002
+        **params: Any,
+    ) -> torch.Tensor:
+        sq_dist = self.covar_dist(
+            self._features(x1), self._features(x2), square_dist=True, diag=diag, **params
+        )
+        return sq_dist.div(-2).exp()
+
+    def metric(self) -> torch.Tensor:
+        """The Mahalanobis metric `M` of shape `(d, d)`."""
+        inv_sq_lengthscale = self.lengthscale.reshape(-1).pow(-2)
+        return torch.diag(inv_sq_lengthscale) + self.projection @ self.projection.T
+
+
+def _numeric_kernel(
+    kernel: KernelType,
+    ard_num_dims: int,
+    active_dims: tuple[int, ...] | None = None,
+) -> Kernel:
+    """The kernel `kernel` of the numerical HPs at `active_dims`."""
+    match kernel:
+        case "scan":
+            return ScanKernel(ard_num_dims=ard_num_dims, active_dims=active_dims)
+        case "rbf":
+            return get_covar_module_with_dim_scaled_prior(
+                ard_num_dims=ard_num_dims, active_dims=active_dims
+            )
+        case _:
+            raise ValueError(f"Unknown kernel {kernel!r}, expected 'rbf' or 'scan'.")
+
+
+def make_default_single_obj_gp(  # noqa: C901
     x: torch.Tensor,
     y: torch.Tensor,
     encoder: ConfigEncoder,
@@ -217,12 +314,15 @@ def make_default_single_obj_gp(
     mean_slope: float = -0.5,
     mean_bias: float = 5.0,
     log_y: bool = False,
+    kernel: KernelType = "rbf",
 ) -> SingleTaskGP:
     """Default GP for single objective optimization.
 
     With a `cost_estimator`, the prior mean is the power law `loss = 10 ** (mean_slope *
     log10(cost) + mean_bias)`, transformed like the outcomes, see `PowerLawMean`. It is
     not used for purely categorical spaces.
+
+    `kernel` is the covariance of the numerical HPs, see `KernelType`.
 
     With `log_y`, the GP models `log(y)`, when all `y` are positive, and the caller has
     to exponentiate its predictions back. The returned GP has `log_y` set to whether it
@@ -254,6 +354,10 @@ def make_default_single_obj_gp(
 
     # Purely categorical
     if len(numerics) == 0:
+        if kernel != "rbf":
+            raise ValueError(
+                f"The kernel {kernel!r} models numerical HPs, but the space has none."
+            )
         gp = SingleTaskGP(
             train_X=x,
             train_Y=y,
@@ -265,16 +369,17 @@ def make_default_single_obj_gp(
 
     # Purely vectorial
     if len(categoricals) == 0:
-        gp = SingleTaskGP(train_X=x, train_Y=y, outcome_transform=y_transform)
+        # The default kernel of `SingleTaskGP` is the "rbf" one, batched per outcome
+        covar_module = None if kernel == "rbf" else _numeric_kernel(kernel, len(numerics))
+        gp = SingleTaskGP(
+            train_X=x, train_Y=y, covar_module=covar_module, outcome_transform=y_transform
+        )
         return _with_power_law_mean(
             gp, log_cost, log_y=log_y, slope=mean_slope, bias=mean_bias, min_cost=min_cost
         )
 
     # Mixed
-    numeric_kernel = get_covar_module_with_dim_scaled_prior(
-        ard_num_dims=len(numerics),
-        active_dims=tuple(numerics),
-    )
+    numeric_kernel = _numeric_kernel(kernel, len(numerics), tuple(numerics))
     cat_kernel = default_categorical_kernel(
         len(categoricals), active_dims=tuple(categoricals)
     )
@@ -314,16 +419,20 @@ def make_single_obj_gp(
     mean_slope: float = -0.5,
     mean_bias: float = 5.0,
     log_y: bool = False,
+    kernel: KernelType = "rbf",
 ) -> SingleTaskGP:
     """The GP of `BayesianOptimization` with the prior mean `prior_mean`, so that
     predictors can model the observations with the GP the optimizer acquired them with.
 
     `"power_law"` is `make_default_single_obj_gp()` with the power law in the cost,
     `"zero"` a zero mean of the standardized outcomes instead, the cost and power law
-    arguments then being unused.
+    arguments then being unused. `kernel` is the covariance of the numerical HPs, see
+    `KernelType`.
     """
     if prior_mean == "zero":
-        gp = make_default_single_obj_gp(x=x, y=y, encoder=encoder, log_y=log_y)
+        gp = make_default_single_obj_gp(
+            x=x, y=y, encoder=encoder, log_y=log_y, kernel=kernel
+        )
         # Not the learned constant mean `SingleTaskGP` defaults to
         gp.mean_module = ZeroMean()
         return gp
@@ -336,6 +445,7 @@ def make_single_obj_gp(
         mean_slope=mean_slope,
         mean_bias=mean_bias,
         log_y=log_y,
+        kernel=kernel,
     )
 
 

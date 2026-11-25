@@ -68,6 +68,7 @@ def _bo(  # noqa: C901, PLR0912
         "none", "space_expansion", "left_budget_contraction"
     ] = "none",
     prior_mean: Literal["power_law", "zero"] = "power_law",
+    kernel: Literal["rbf", "scan"] = "rbf",
     target_cost: float | None = None,
 ) -> BayesianOptimization:
     """Initialise the BO loop.
@@ -164,6 +165,7 @@ def _bo(  # noqa: C901, PLR0912
         log_y=log_y,
         prior_mean=prior_mean,
         budget_schedule=budget_schedule,
+        kernel=kernel,
         target_cost=target_cost,
     )
 
@@ -426,6 +428,7 @@ def bayesian_optimization(
         "none", "space_expansion", "left_budget_contraction"
     ] = "none",
     prior_mean: Literal["power_law", "zero"] = "power_law",
+    kernel: Literal["rbf", "scan"] = "rbf",
     target_cost: float | None = None,
     sample_prior_first: bool = False,
 ) -> BayesianOptimization:
@@ -541,6 +544,7 @@ def bayesian_optimization(
         acquisition_func_type=acquisition_func_type,
         log_y=log_y,
         prior_mean=prior_mean,
+        kernel=kernel,
         budget_schedule=budget_schedule,
         target_cost=target_cost,
     )
