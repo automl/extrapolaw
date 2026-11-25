@@ -1,5 +1,5 @@
 
-This content tree contains the core components and utilities of ScaleFM, generated from its code. Below is an overview of the files and their purposes:
+This content tree contains the core components and utilities of ScaleFM, designed to simplify and enhance the process of running scaling studies. Below is an overview of the files and their purposes:
 
 - [`scalefm.api`](scalefm/api.md): The main functions of a scaling study:
     - `scalefm.acquire()` **samples configurations** under a cost budget and optionally **evaluates them**;

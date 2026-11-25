@@ -46,7 +46,7 @@ class MySpace(scalefm.PipelineSpace):
     learning_rate = scalefm.Float(lower=1e-5, upper=1e-1, log=True)
 ```
 
-The [`cost_estimator`](scalefm_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration) usually computes the cost of a configuration from them, and [Chinchilla](optimizers.md#32-chinchilla-guided-scaling) lays out its configurations along them: all of them except `data_parameter_name` make up the model size.
+The [`cost_estimator`](scalefm_acquire.md#scaling-studies-estimating-the-cost-of-a-configuration) usually computes the cost of a configuration from them, and [Chinchilla](optimizers.md#32-chinchilla-guided-scaling) lays out its configurations along them.
 
 ### Providing a **Fidelity** Parameter
 
