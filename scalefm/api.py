@@ -84,10 +84,11 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
 ) -> None:
     """Acquire the data of a scaling study: sample configurations and evaluate them.
 
-    Configurations are sampled within a cost budget and evaluated with
-    `evaluate_pipeline`, or, with `is_async=True`, only sampled for jobs that report
-    their results with `scalefm.save_pipeline_results()`. Fit and extrapolate the
-    results afterwards with [`scalefm.predict()`][scalefm.api.predict].
+    Configurations are sampled within the budget and each one is evaluated with
+    `evaluate_pipeline`. With `is_async=True`, they are only sampled: train each one
+    elsewhere, e.g. in a Slurm job, and report its result with
+    [`scalefm.save_pipeline_results()`][scalefm.api.save_pipeline_results]. Fit and
+    extrapolate the results afterwards with [`scalefm.predict()`][scalefm.api.predict].
 
     !!! tip "Parallelization"
 
@@ -782,9 +783,10 @@ def predict(
             are rounded either way.
 
     Returns:
-        One `Prediction` per target budget, with its `target_cost` and the `loss`,
-            `n_params`, `n_data` and `config` predicted there. What the predictor
-            does not provide is `None`.
+        One [`Prediction`][scalefm.prediction.Prediction] per target budget, with its
+            `target_cost` and the `loss`, `n_params`, `n_data` and `config` predicted
+            there. What is not predicted, by the predictor or because of `targets`,
+            is `None`.
     """
     from scalefm.plot.scaling_plots import Estimators
     from scalefm.prediction import (

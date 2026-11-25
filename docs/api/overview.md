@@ -2,8 +2,8 @@
 This content tree contains the core components and utilities of ScaleFM, designed to simplify and enhance the process of running scaling studies. Below is an overview of the files and their purposes:
 
 - [`scalefm.api`](scalefm/api.md): The main functions of a scaling study:
-    - `scalefm.acquire()` **samples configurations** under a cost budget and optionally **evaluates them**;
-    - `scalefm.save_pipeline_results()` reports the result of a configuration trained in its own job;
+    - `scalefm.acquire()` **samples configurations** under a cost budget and **trains them** with your `evaluate_pipeline`, or only samples them with `is_async=True`;
+    - `scalefm.save_pipeline_results()` **reports the result** of a configuration you trained yourself, e.g. in a Slurm job;
     - `scalefm.predict()` **fits the scaling law** and predicts at larger costs;
 - `scalefm.prediction`: The predictors behind `scalefm.predict()`: the [power law](scalefm/prediction/power_law.md), [Chinchilla](scalefm/prediction/chinchilla3.md) and the [GP posterior](scalefm/prediction/gp.md).
 - `scalefm.optimizers`:
