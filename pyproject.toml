@@ -88,6 +88,10 @@ carbs = [
     "carbs @ git+https://github.com/imbue-ai/carbs@8f7fee08658ad567d9dd6b6233247bc37d9962ea",
 ]
 
+[tool.uv]
+# fonttools 4.69.0 (a dependency of matplotlib) was published with cp311 wheels only.
+constraint-dependencies = ["fonttools!=4.69.0"]
+
 [tool.setuptools.packages.find]
 include = [
     "scalefm",
