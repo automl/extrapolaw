@@ -1142,7 +1142,7 @@ class Float(Domain[float]):
             prior: The prior value for the domain, if any.
             prior_confidence: The confidence level of the prior value.
             is_compute_scaling: Whether this parameter scales the compute cost of
-              the pipeline (e.g. a fidelity used for compute-scaling optimizers).
+              the pipeline, e.g. the model width or the number of training tokens.
             **kwargs: Additional keyword arguments (e.g., is_fidelity) are accepted
                 for backward compatibility but ignored in PipelineSpace parameters.
 
@@ -1395,7 +1395,7 @@ class Integer(Domain[int]):
             prior: The prior value for the domain, if any.
             prior_confidence: The confidence level of the prior value.
             is_compute_scaling: Whether this parameter scales the compute cost of
-              the pipeline (e.g. a fidelity used for compute-scaling optimizers).
+              the pipeline, e.g. the model width or the number of training tokens.
             **kwargs: Additional keyword arguments (e.g., is_fidelity) are accepted
                 for backward compatibility but ignored in PipelineSpace parameters.
         """
