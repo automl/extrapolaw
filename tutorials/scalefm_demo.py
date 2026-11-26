@@ -12,10 +12,12 @@
 #     name: python3
 # ---
 
+# <img src="static/demo_qrcode.png" width="90" align="right">
+#
 # # ScaleFM Demo on Scaling Analysis for NanoTabPFN
 #
 # A **scaling analysis** answers: *if I train with 20x more compute, what loss will I get,
-# and how should I scale the model and the hyperparameters?* This notebook analyzes the scaling behaviour of **NanoTabPFN** on a surrogate benchmark built from thousands of real training runs.
+# and how should I scale the model and the hyperparameters?* This notebook analyzes the scaling behavior of **NanoTabPFN** on a surrogate benchmark built from thousands of real training runs.
 #
 # Where this notebook gets to, extrapolating 20x beyond the largest run:
 #
@@ -28,7 +30,7 @@
 #
 # ScaleFM automates that with these five components:
 #
-# 1. **Search space.** `scalefm.PipelineSpace` declares the hyperparameters, their types and their scales (linear or log). Some are compute-scaling parameters (`is_compute_scaling=True`), such as the model size or the amount of data `total_cells`; the others are ordinary hyperparameters, such as the learning rate.
+# 1. **Search space.** `scalefm.PipelineSpace` declares the hyperparameters, their types and their scales (linear or log). Some are compute-scaling parameters (`is_compute_scaling=True`), such as the model size; the others are ordinary hyperparameters, such as the learning rate.
 # 2. **Acquisition.** Decides which small runs to train within a compute budget.
 # 3. **Prediction.** Fits a model to the acquired runs and predicts the loss, the compute-optimal model
 #    size and data, and a full config at any target compute.
@@ -92,8 +94,8 @@ def show(*images, width=480):
 # the inference cost.
 #
 # Here, the surrogate benchmark of `scan_bench` stands in for the training: it predicts
-# what a TabPFN training run would reach, its validation loss and its negative
-# log-likelihood on real tabular datasets, a downstream metric.
+# what a TabPFN training run would reach: its validation loss, and as a downstream
+# metric its negative log-likelihood on real tabular datasets.
 
 # %%capture
 loss_benchmark = tabpfn.get_benchmark(TabPFNTarget.VAL_LOSS)
@@ -161,13 +163,12 @@ RESULTS = Path("results")
 
 MAX_COST_PER_RUN = 2.8e14
 BUDGET = MAX_COST_PER_RUN * 20
-# TARGETS = [1e15, 5.6e15]  # About 3.6x and 20x the cost of the largest run
 TARGETS = [5.6e15]  # About 20x the cost of the largest run
 
 
 # -
 
-# ## Three extrapolations: loss, model size and full config
+# ## Acquisition and extrapolation
 #
 # ![Data acquisition, then extrapolation to the loss, model size and full config at the target FLOPs](static/scaling_pipeline.png)
 #
@@ -181,7 +182,7 @@ TARGETS = [5.6e15]  # About 20x the cost of the largest run
 #
 # Not every predictor gives all three:
 #
-# | predictor | fits | $L^*$ | model size ($N^*$, $D^*$) | $\lambda^*$ | comment |
+# | predictor | fits | $L^*$ | $N^*$ | $\lambda^*$ | comment |
 # |---|---|---|---|---|---|
 # | `chinchilla3` | Chinchilla's law $L(N, D)$ | yes | yes | no | - |
 # | `power_law` | straight lines in log-log through the frontier runs | yes | yes | yes | ignores the joint dependency of the hyperparameters |
@@ -196,7 +197,7 @@ TARGETS = [5.6e15]  # About 20x the cost of the largest run
 # Chinchilla's approach 1 trains a ladder of model sizes, each on a few multiples of
 # its parameter count in cells (`data_multipliers`), and grows the models until the
 # budget is spent. From these runs it reads off the lowest loss at each compute, the
-# compute-optimal frontier. Like the Chinchilla paper it keeps a fixed training recipe,
+# compute-optimal frontier. Like the Chinchilla paper, it keeps a fixed training recipe,
 # so it runs on a version of the space with constant hyperparameters:
 
 # +
@@ -206,8 +207,8 @@ class TabPFNChinchillaSpace(scalefm.PipelineSpace):
     embedding_size = scalefm.Integer(4, 256, log=True, log_base=2, is_compute_scaling=True)
     # The other hyperparameters, fixed
     num_layers = 2  # scalefm.Integer(2, 32, log=True, log_base=2, is_compute_scaling=True)
-    effective_batch_size = 64  # effective_batch_size = scalefm.Integer(16, 256, log=True, log_base=2)
-    lr = 1e-3  # lr = scalefm.Float(1e-4, 5e-2, log=True)
+    effective_batch_size = 64  # scalefm.Integer(16, 256, log=True, log_base=2)
+    lr = 1e-3  # scalefm.Float(1e-4, 5e-2, log=True)
 
 
 CHINCHILLA1 = RESULTS / "chinchilla1"
@@ -276,7 +277,7 @@ scalefm.acquire(
     overwrite_root_directory=True,
 )
 
-predictions = scalefm.predict(DEFAULT, target_costs=TARGETS, target_inference_costs=[1e7])
+predictions = scalefm.predict(DEFAULT, target_costs=TARGETS, target_inference_costs=[1e8])
 for target, prediction in zip(TARGETS, predictions):
     print(f"C={target:.1e}: loss {prediction.loss:.3f},"
           f" N*={prediction.n_params:.2e}, D*={prediction.n_data:.2e}")
@@ -307,10 +308,10 @@ show(DEFAULT / "summary/downstream/real_nll/real_nll_over_cost.png")
 
 # ### Inference cost
 #
-# When the runs report an `inference_cost`, the loss is also plotted over it: the best
-# loss reached at each inference cost:
+# When the runs report an `inference_cost`, the loss is also plotted over it, showing
+# the best loss reached at each inference cost:
 
-show(DEFAULT / "summary/pre_train/loss_over_inference_cost.png")
+show(CHINCHILLA1 / "summary/pre_train/loss_over_inference_cost.png")
 
 # ## 3. Parallel workers [for you to try!]
 #
@@ -402,7 +403,7 @@ sample(4)
 print("pending:", [trial_id for trial_id, _ in scalefm.fetch_pending_trials(ASYNC, n=4)])
 # -
 
-# The job script, which reads its config from `config.yaml`. Every rank runs it, and rank 0
+# The job script reads its config from `config.yaml`. Every rank runs it, and rank 0
 # reports. It reports the cost itself, as the `cost_estimator` of `acquire` only fills
 # in the cost of results returned by an `evaluate_pipeline`:
 

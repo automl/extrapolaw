@@ -430,6 +430,17 @@ def plot_parameter_over_cost(
         )
     ax.set(xscale="log", yscale="log")
     _style(ax, f"{parameter} over {cost_label}", cost_label.capitalize(), parameter)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=3,
+        frameon=False,
+        fontsize=9,
+        labelcolor=SECONDARY_INK,
+    )
     fig.colorbar(points, ax=ax, label="Loss")
     return fig
 
