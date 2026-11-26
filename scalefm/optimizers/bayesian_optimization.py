@@ -654,7 +654,7 @@ class BayesianOptimization(ScalingOptimizer):
                 cost_estimator,
             )
             if mean_params.fit is not None:
-                logger.info(
+                logger.debug(
                     f"Fitted power law: slope={mean_params.slope:.4f}, "
                     f"intercept={mean_params.intercept:.4f}, "
                     f"r²={mean_params.fit.r_squared:.4f}, "
