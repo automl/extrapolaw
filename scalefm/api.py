@@ -222,8 +222,11 @@ def acquire(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
         is_async: If true, only sample configurations, without evaluating them. Each
             one is written to `root_directory/configs/config_<id>/config.yaml` and
-            left pending; launch a job for it yourself (e.g. with Slurm), and report
-            its result from the job with
+            left pending; get them with
+            [`scalefm.fetch_pending_trials()`][scalefm.api.fetch_pending_trials],
+            launch a job for each yourself (e.g. with Slurm) and mark it with
+            [`scalefm.mark_trial_evaluating()`][scalefm.api.mark_trial_evaluating],
+            and report its result from the job with
             [`scalefm.save_pipeline_results()`][scalefm.api.save_pipeline_results].
             Requires `evaluate_pipeline=None`.
             ??? note "tradeoff of async mode"
@@ -710,6 +713,57 @@ def save_pipeline_results(
     )
 
 
+def fetch_pending_trials(
+    root_directory: str | Path, n: int
+) -> list[tuple[str, dict[str, Any]]]:
+    """Get up to `n` pending trials of an async run, oldest first.
+
+    Mark each with [`mark_trial_evaluating`][scalefm.api.mark_trial_evaluating] when
+    its job is launched, else it is returned again.
+
+    Args:
+        root_directory: Root directory of the ScaleFM run.
+        n: The maximum number of trials to return.
+
+    Returns:
+        A list of `(pipeline_id, config)`.
+    """
+    root_directory = Path(root_directory)
+    state = ScaleFMState.create_or_load(path=root_directory, load_only=True)
+    configs = root_directory / "configs"
+    return [
+        (
+            trial.id,
+            load_config(config_path=configs / f"config_{trial.id}" / "config.yaml"),
+        )
+        for trial in state.lock_and_get_next_pending_trial(n)
+    ]
+
+
+def mark_trial_evaluating(
+    root_directory: str | Path,
+    pipeline_id: str,
+    worker_id: str | None = None,
+) -> None:
+    """Mark a pending trial as being evaluated, e.g. once its job is launched.
+
+    Args:
+        root_directory: Root directory of the ScaleFM run.
+        pipeline_id: The id of the trial, as from `fetch_pending_trials`.
+        worker_id: Who evaluates it, e.g. the Slurm job id. Defaults to an id of
+            this process.
+
+    Raises:
+        ScaleFMError: If the trial is not pending.
+    """
+    from scalefm.optimizers.ask_and_tell import _default_worker_name
+
+    state = ScaleFMState.create_or_load(path=Path(root_directory), load_only=True)
+    state.lock_and_set_trial_evaluating(
+        pipeline_id, worker_id if worker_id is not None else _default_worker_name()
+    )
+
+
 def analyze(root_directory: str | Path) -> None:
     """Rebuild the `summary` folder of a run without evaluating anything.
 
@@ -859,6 +913,7 @@ def predict(
         space,
         Estimators(params=params_estimator, cost=cost_estimator),
         rounded_fit=rounded_fit,
+        max_cost_per_config=optimizer_info.get("derived", {}).get("max_cost_per_config"),
     )
     return predictions
 
@@ -937,10 +992,12 @@ def _save_predictions(
     estimators: Estimators | None = None,
     *,
     rounded_fit: bool = False,
+    max_cost_per_config: float | None = None,
 ) -> None:
     """Save `target_costs` to `summary/targets.json`, and the scaling plots,
     predictions and convergence at them. The GP posterior plots need the cost
-    estimator of `estimators`.
+    estimator of `estimators`, and their extrapolation region starts at
+    `max_cost_per_config`, if the run had one.
     """
     from scalefm.optimizers.optimizer import Artifact, ArtifactType
     from scalefm.plot.scaling_plots import plot_convergence, plot_scaling
@@ -948,7 +1005,13 @@ def _save_predictions(
     try:
         artifacts = [Artifact("targets", target_costs, ArtifactType.JSON)]
         artifacts += plot_scaling(
-            trials, predictor, target_costs, space, estimators, rounded_fit
+            trials,
+            predictor,
+            target_costs,
+            space,
+            estimators,
+            rounded_fit=rounded_fit,
+            max_cost_per_config=max_cost_per_config,
         )
         artifacts += plot_convergence(trials, predictor, target_costs, space, estimators)
         SummaryWriter(root_directory=root_directory).write(artifacts)

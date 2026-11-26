@@ -78,6 +78,20 @@ def test_power_law_mean_params_only_fit_the_pareto_front() -> None:
     assert abs(on_front.slope + 0.05) < 1e-9
 
 
+def test_power_law_mean_params_skip_the_low_compute_plateau() -> None:
+    configs = [{"n_params": 10.0 ** (k / 2), "n_data": 1e9} for k in range(8, 20)]
+    losses = [10.0 * _cost(**c) ** -0.05 for c in configs]
+    # The 4 cheapest runs are stuck just above the power law
+    losses[:4] = [losses[4] * (1.04 - 0.01 * i) for i in range(4)]
+
+    params = fit_power_law_mean_params(configs, losses, _cost)
+
+    assert params.fit is not None
+    assert params.fit.num_points == 8
+    assert params.slope == pytest.approx(-0.05)
+    assert len(params.flops) == len(configs)
+
+
 def _cost_with_hps(n_params: float, n_data: float, **_: float) -> float:
     return _cost(n_params, n_data)
 

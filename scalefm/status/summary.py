@@ -48,6 +48,7 @@ def calculate_total_resource_usage(
     subset_worker_id: str | None = None,
     *,
     include_in_progress: bool = False,
+    include_pending: bool = False,
 ) -> ResourceUsage:
     """Calculates total resources returning a typed usage object.
 
@@ -56,13 +57,20 @@ def calculate_total_resource_usage(
         subset_worker_id: If provided, only calculates for
             trials evaluated by this worker ID.
         include_in_progress: Whether to include incomplete trials.
+        include_pending: Whether to include pending trials, counted for the worker
+            that sampled them, e.g. the trials sampled by `acquire(is_async=True)`.
     """
+
+    def _is_pending(t: Trial) -> bool:
+        return include_pending and t.metadata.state == Trial.State.PENDING
+
     relevant_trials = list(trials.values())
     if subset_worker_id is not None:
         relevant_trials = [
             t
             for t in relevant_trials
             if t.metadata.evaluating_worker_id == subset_worker_id
+            or (_is_pending(t) and t.metadata.sampling_worker_id == subset_worker_id)
         ]
 
     usage = ResourceUsage()
@@ -71,6 +79,7 @@ def calculate_total_resource_usage(
         if not (
             trial.report is not None
             or (include_in_progress and trial.metadata.state == Trial.State.EVALUATING)
+            or _is_pending(trial)
         ):
             continue
         usage.evaluations += 1
@@ -225,20 +234,29 @@ class SummaryWriter:
 
     def _plot_artifacts(self, trials: Sequence[Trial]) -> list[Artifact]:
         try:
-            return plot_scaling(trials, self._run_fit(), space=self._search_space())
+            return plot_scaling(
+                trials,
+                self._run_fit(),
+                space=self._search_space(),
+                max_cost_per_config=self._derived().get("max_cost_per_config"),
+            )
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to create the summary plot: {e}")
             return []
 
     def _run_fit(self) -> str:
         """The scaling law the run's optimizer names."""
+        return self._derived().get("predictor", "power_law")
+
+    def _derived(self) -> dict:
+        """What the run derived from its optimizer and arguments, if it saved it."""
         try:
             info = _deserialize_optimizer_info(
                 self.root_directory / "optimizer_info.yaml"
             )
         except Exception:  # noqa: BLE001
-            return "power_law"
-        return info.get("derived", {}).get("predictor", "power_law")
+            return {}
+        return dict(info.get("derived") or {})
 
     def _search_space(self) -> SearchSpace | None:
         """The search space of the run, of the classic kind the scaling laws take."""

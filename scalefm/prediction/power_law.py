@@ -1,6 +1,10 @@
 """Power-law prediction: log-log linear fits in the compute, one per predicted quantity.
 
-* `LOSS`: the loss on the (flops, loss) Pareto front, see https://arxiv.org/abs/2001.08361.
+* `LOSS`: the loss on the (flops, loss) Pareto front, see https://arxiv.org/abs/2001.08361,
+  above a fitted irreducible loss E: `log10(loss - E) = slope * log10(flops) + intercept`.
+
+The LOSS and FULL fits skip the low-compute plateau of the front, if any, see
+`scaling_regime_start`.
 * `COARSE`: the model size on the learning-curve envelope (Chinchilla approach 1),
   with `n_data = flops / (6 * n_params)`.
 * `FULL`: every searchable hyperparameter on the (flops, loss) Pareto front.
@@ -19,7 +23,9 @@ from scalefm.prediction.pareto import pareto_front
 from scalefm.prediction.scaling_law_fit import (
     LogLogPowerLawFit,
     fit_power_law,
+    fit_power_law_with_offset,
     predict_from_loglog_fit,
+    scaling_regime_start,
 )
 from scalefm.space import HPOFloat, HPOInteger, SearchSpace
 
@@ -31,7 +37,7 @@ LC_ENVELOPE_NUM_FLOPS = 1500
 LC_SMOOTHING_SIGMA = 0.05
 
 #: Width of a serialized `LogLogPowerLawFit`, see `fit_to_row`.
-ROW_WIDTH = 6
+ROW_WIDTH = 7
 
 
 @dataclass
@@ -46,6 +52,7 @@ class PowerLawLossInfo:
     predicted_loss: float
     predicted_loss_upper: float
     predicted_loss_lower: float
+    irreducible_loss: float = 0.0
 
 
 @dataclass
@@ -60,20 +67,29 @@ class PowerLawCoarseInfo:
 
 @dataclass
 class PowerLawFullFit:
-    """One power law per searchable HP, plus the Pareto front it was fitted on."""
+    """One power law per searchable HP, plus the Pareto front it was fitted on.
+
+    The HPs are fitted on the front from `fit_start` on, past its low-compute plateau.
+    """
 
     hp_fits: dict[str, LogLogPowerLawFit]
     pareto_ids: list[int]
     pareto_configs: list[dict[str, Any]]
     pareto_flops: list[float]
     pareto_losses: list[float]
+    fit_start: int = 0
 
 
 # --- LOSS ------------------------------------------------------------------------
 
 
 def fit_loss(rows: list[Row]) -> LogLogPowerLawFit:
-    """Fit log10(loss) against log10(flops) on the (flops, loss) Pareto front."""
+    """Fit `log10(loss - E) = slope * log10(flops) + intercept` on the (flops, loss)
+    Pareto front, with the irreducible loss E (the `offset` of the fit) in
+    `[0, min(loss))`, see `fit_power_law_with_offset`.
+
+    Only the front past its low-compute plateau is fit, see `scaling_regime_start`.
+    """
     rows_arr = np.asarray(rows, dtype=float)
     if rows_arr.ndim != 2 or rows_arr.shape[1] != 4:
         raise ValueError("rows must be a 2D array-like with shape (n, 4)")
@@ -94,8 +110,10 @@ def fit_loss(rows: list[Row]) -> LogLogPowerLawFit:
         raise ValueError("Could not compute a Pareto front from the provided rows")
 
     pareto_flops, pareto_losses, _pareto_indices = res
-    fit_result = fit_power_law(
-        np.asarray(pareto_flops, dtype=float), np.asarray(pareto_losses, dtype=float)
+    start = scaling_regime_start(pareto_flops, pareto_losses)
+    fit_result = fit_power_law_with_offset(
+        np.asarray(pareto_flops[start:], dtype=float),
+        np.asarray(pareto_losses[start:], dtype=float),
     )
     if fit_result is None:
         raise ValueError("Could not fit a power law to the loss from the provided rows")
@@ -123,6 +141,7 @@ def predict_loss(
         predicted_loss=predicted_loss,
         predicted_loss_upper=predicted_loss_upper,
         predicted_loss_lower=predicted_loss_lower,
+        irreducible_loss=fit.offset,
     )
     return predicted_loss, info
 
@@ -431,12 +450,17 @@ def fit_full(
     losses: list[float],
     flops: list[float],
 ) -> PowerLawFullFit:
-    """Fit one power law per searchable HP on the Pareto front of the configs."""
+    """Fit one power law per searchable HP on the Pareto front of the configs, past
+    its low-compute plateau, see `scaling_regime_start`.
+    """
     pareto_ids, pareto_configs, pareto_flops, pareto_losses = compute_full_pareto(
         configs=configs, losses=losses, flops=flops
     )
+    start = scaling_regime_start(pareto_flops, pareto_losses)
     hp_fits = fit_hp_power_laws(
-        space=space, pareto_configs=pareto_configs, pareto_flops=pareto_flops
+        space=space,
+        pareto_configs=pareto_configs[start:],
+        pareto_flops=pareto_flops[start:],
     )
     return PowerLawFullFit(
         hp_fits=hp_fits,
@@ -444,6 +468,7 @@ def fit_full(
         pareto_configs=pareto_configs,
         pareto_flops=pareto_flops,
         pareto_losses=pareto_losses,
+        fit_start=start,
     )
 
 
@@ -490,6 +515,7 @@ def predict_full(
         "pareto_configs": fit.pareto_configs,
         "pareto_flops": fit.pareto_flops,
         "pareto_losses": fit.pareto_losses,
+        "pareto_fit_start": fit.fit_start,
     }
 
 
@@ -507,6 +533,7 @@ def fit_to_row(fit: LogLogPowerLawFit | None) -> list[float]:
         fit.slope_std_err,
         fit.intercept_std_err,
         float(fit.num_points),
+        fit.offset,
     ]
 
 
@@ -520,7 +547,9 @@ def fit_from_row(row: np.ndarray) -> LogLogPowerLawFit | None:
     row = np.asarray(row, dtype=float)
     if np.any(np.isnan(row[:2])):
         return None
-    slope, intercept, r_squared, slope_std_err, intercept_std_err, num_points = row
+    # Rows without an offset were written before it was fitted
+    slope, intercept, r_squared, slope_std_err, intercept_std_err, num_points = row[:6]
+    offset = float(row[6]) if len(row) > 6 and np.isfinite(row[6]) else 0.0
     return LogLogPowerLawFit(
         slope=float(slope),
         intercept=float(intercept),
@@ -528,4 +557,5 @@ def fit_from_row(row: np.ndarray) -> LogLogPowerLawFit | None:
         slope_std_err=float(slope_std_err),
         intercept_std_err=float(intercept_std_err),
         num_points=int(num_points) if np.isfinite(num_points) else 0,
+        offset=offset,
     )

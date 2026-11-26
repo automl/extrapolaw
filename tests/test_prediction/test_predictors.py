@@ -92,6 +92,56 @@ def test_power_law_recovers_a_pure_power_law() -> None:
     assert power_law.fit_from_row(np.asarray(power_law.fit_to_row(fit))) == fit
 
 
+def test_power_law_recovers_the_irreducible_loss() -> None:
+    flops = np.logspace(15, 19, 12)
+    rows: list[Row] = [(1.0, 1.0, 1.5 + 50.0 * c**-0.1, float(c)) for c in flops]
+
+    fit = power_law.fit_loss(rows)
+    loss, info = power_law.predict_loss(fit, 1e22)
+
+    assert info.irreducible_loss == pytest.approx(1.5, rel=1e-3)
+    assert fit.slope == pytest.approx(-0.1, rel=1e-3)
+    assert loss == pytest.approx(1.5 + 50.0 * 1e22**-0.1, rel=1e-4)
+    assert power_law.fit_from_row(np.asarray(power_law.fit_to_row(fit))) == fit
+
+
+def _plateau_then_law() -> tuple[np.ndarray, np.ndarray]:
+    """8 runs on 50 * flops^-0.1, after 4 cheap runs stuck just above them."""
+    flops = np.logspace(10, 16, 12)
+    losses = 50.0 * flops**-0.1
+    losses[:4] = losses[4] * (1.04 - 0.01 * np.arange(4))
+    return flops, losses
+
+
+def test_power_law_skips_the_low_compute_plateau() -> None:
+    flops, losses = _plateau_then_law()
+    rows: list[Row] = [
+        (1.0, 1.0, float(loss), float(c)) for c, loss in zip(flops, losses, strict=True)
+    ]
+
+    fit = power_law.fit_loss(rows)
+    loss, _ = power_law.predict_loss(fit, 1e18)
+
+    assert fit.num_points == 8
+    assert loss == pytest.approx(50.0 * 1e18**-0.1, rel=1e-3)
+
+
+def test_power_law_full_skips_the_low_compute_plateau() -> None:
+    flops, losses = _plateau_then_law()
+    # n_params is stuck too on the plateau, then grows as flops^0.5
+    n_params = np.where(np.arange(12) < 4, 1e6, 0.1 * flops**0.5)
+    configs = [{"n_params": float(n), "n_data": 1e9} for n in n_params]
+
+    fit = power_law.fit_full(
+        space=SPACE, configs=configs, losses=list(losses), flops=list(flops)
+    )
+
+    assert fit.fit_start == 4
+    assert len(fit.pareto_flops) == 12
+    assert fit.hp_fits["n_params"].num_points == 8
+    assert fit.hp_fits["n_params"].slope == pytest.approx(0.5)
+
+
 def test_power_law_coarse_on_rows_and_learning_curves() -> None:
     # n_params = 0.1 * flops^0.5 along the compute optimal frontier
     flops = np.logspace(15, 19, 10)

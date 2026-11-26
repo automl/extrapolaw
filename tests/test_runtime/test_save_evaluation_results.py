@@ -54,57 +54,50 @@ def test_async_happy_path_changes_state(scalefm_state: ScaleFMState) -> None:
         is_async=True,
     )
 
-    callback_holder: list[callable] = []
-
-    def async_eval_fn(*_, pipeline_id, pipeline_directory, **__):
-        # run async after 5 seconds
-        def async_save(user_result):
-            save_pipeline_results(
-                pipeline_id=pipeline_id,
-                user_result=user_result,
-                root_directory=Path(scalefm_state.path),
-            )
-
-        callback_holder.append(async_save)
+    def never_called(**_):
+        raise AssertionError("An async worker only samples.")
 
     DefaultWorker.new(
         state=scalefm_state,
         optimizer=optimizer,
-        evaluation_fn=async_eval_fn,
+        evaluation_fn=never_called,
         settings=settings,
     ).run()
 
     trials = scalefm_state.lock_and_read_trials()
     assert len(trials) == 2
     for trial in trials.values():
-        assert trial.metadata.state == Trial.State.EVALUATING
+        assert trial.metadata.state == Trial.State.PENDING
         assert trial.report is None
+    first, second = sorted(trials, key=lambda i: trials[i].metadata.time_sampled)
 
-    result_dict = {"objective_to_minimize": 0.3, "cost": 1.2}
-    callback_holder[0](result_dict)
+    def save(pipeline_id: str, user_result: dict) -> None:
+        save_pipeline_results(
+            pipeline_id=pipeline_id,
+            user_result=user_result,
+            root_directory=Path(scalefm_state.path),
+        )
+
+    save(first, {"objective_to_minimize": 0.3, "cost": 1.2})
     trials = scalefm_state.lock_and_read_trials()
-    trial_iter = iter(trials.values())
-    trial_after = next(trial_iter)
-    assert trial_after.metadata.state == Trial.State.SUCCESS
-    assert trial_after.report.objective_to_minimize == 0.3
-    assert trial_after.report.cost == 1.2
+    assert trials[first].metadata.state == Trial.State.SUCCESS
+    assert trials[first].report.objective_to_minimize == 0.3
+    assert trials[first].report.cost == 1.2
 
-    # second trial is not submitted yet
-    trial_after = next(trial_iter)
-    assert trial_after.metadata.state == Trial.State.EVALUATING
+    # second trial is not reported yet
+    assert trials[second].metadata.state == Trial.State.PENDING
 
-    # Without a cost, the result is refused and the trial is still being evaluated
+    # Without a cost, the result is refused and the trial is still pending
     with pytest.raises(ValueError, match="no 'cost'"):
-        callback_holder[1]({"objective_to_minimize": 10})
-    trial_after = list(scalefm_state.lock_and_read_trials().values())[1]
-    assert trial_after.metadata.state == Trial.State.EVALUATING
-
-    callback_holder[1]({"objective_to_minimize": 10, "cost": 2.0})
+        save(second, {"objective_to_minimize": 10})
     trials = scalefm_state.lock_and_read_trials()
-    trial_after = list(trials.values())[1]
-    assert trial_after.metadata.state == Trial.State.SUCCESS
-    assert trial_after.report.objective_to_minimize == 10
-    assert trial_after.report.cost == 2.0
+    assert trials[second].metadata.state == Trial.State.PENDING
+
+    save(second, {"objective_to_minimize": 10, "cost": 2.0})
+    trials = scalefm_state.lock_and_read_trials()
+    assert trials[second].metadata.state == Trial.State.SUCCESS
+    assert trials[second].report.objective_to_minimize == 10
+    assert trials[second].report.cost == 2.0
 
 
 def test_async_save_updates_the_whole_summary(scalefm_state: ScaleFMState) -> None:
@@ -124,28 +117,21 @@ def test_async_save_updates_the_whole_summary(scalefm_state: ScaleFMState) -> No
         is_async=True,
     )
 
-    callback_holder: list[callable] = []
-
-    def async_eval_fn(*_, pipeline_id, pipeline_directory, **__):
-        def async_save(user_result):
-            save_pipeline_results(
-                pipeline_id=pipeline_id,
-                user_result=user_result,
-                root_directory=Path(scalefm_state.path),
-            )
-
-        callback_holder.append(async_save)
-
     DefaultWorker.new(
         state=scalefm_state,
         optimizer=optimizer,
-        evaluation_fn=async_eval_fn,
+        evaluation_fn=lambda **_: None,
         settings=settings,
     ).run()
 
     summary_dir = Path(scalefm_state.path) / "summary"
 
-    callback_holder[0]({"objective_to_minimize": 0.3, "cost": 1.2})
+    (pipeline_id,) = scalefm_state.lock_and_read_trials()
+    save_pipeline_results(
+        pipeline_id=pipeline_id,
+        user_result={"objective_to_minimize": 0.3, "cost": 1.2},
+        root_directory=Path(scalefm_state.path),
+    )
 
     full = (summary_dir / "full.csv").read_text()
     assert "objective_to_minimize" in full
@@ -265,7 +251,62 @@ def test_async_acquire_samples_configs_a_job_reports_later(tmp_path: Path) -> No
         .values()
     }
     assert states[pipeline_id] == Trial.State.SUCCESS
-    assert list(states.values()).count(Trial.State.EVALUATING) == 1
+    assert list(states.values()).count(Trial.State.PENDING) == 1
+
+
+def test_fetch_pending_trials_and_mark_them_evaluating(tmp_path: Path) -> None:
+    """Fetched trials stay pending until marked, marking takes them out of the
+    pending ones, and the pending trials count toward the budgets.
+    """
+    root = tmp_path / "root"
+    scalefm.acquire(
+        pipeline_space=ASpace(),
+        root_directory=root,
+        is_async=True,
+        worker_evaluations_to_spend=3,
+    )
+
+    def states() -> dict[str, Trial.State]:
+        trials = ScaleFMState.create_or_load(root, load_only=True).lock_and_read_trials()
+        return {t.id: t.metadata.state for t in trials.values()}
+
+    assert list(states().values()) == [Trial.State.PENDING] * 3
+
+    fetched = scalefm.fetch_pending_trials(root, 2)
+    assert len(fetched) == 2
+    assert all(set(config) == {"a"} for _, config in fetched)
+    # Not marked yet, so fetched again
+    assert scalefm.fetch_pending_trials(root, 2) == fetched
+
+    pipeline_id = fetched[0][0]
+    scalefm.mark_trial_evaluating(root, pipeline_id, worker_id="w1")
+    trial = ScaleFMState.create_or_load(root, load_only=True).lock_and_get_trial_by_id(
+        pipeline_id
+    )
+    assert trial.metadata.state == Trial.State.EVALUATING
+    assert trial.metadata.evaluating_worker_id == "w1"
+    with pytest.raises(scalefm.exceptions.ScaleFMError, match="not pending"):
+        scalefm.mark_trial_evaluating(root, pipeline_id, worker_id="w2")
+
+    remaining = [i for i, _ in scalefm.fetch_pending_trials(root, 5)]
+    assert len(remaining) == 2
+    assert pipeline_id not in remaining
+
+    save_pipeline_results(
+        user_result={"objective_to_minimize": 0.3, "cost": 1.0},
+        pipeline_id=pipeline_id,
+        root_directory=root,
+    )
+    assert states()[pipeline_id] == Trial.State.SUCCESS
+
+    # The pending trials count toward the total budget: only one more is sampled
+    scalefm.acquire(
+        root_directory=root,
+        is_async=True,
+        worker_evaluations_to_spend=2,
+        total_evaluations_to_spend=4,
+    )
+    assert len(states()) == 4
 
 
 def test_acquire_defaults_to_random_search(tmp_path: Path) -> None:

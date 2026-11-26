@@ -748,6 +748,21 @@ class ScaleFMState:  # noqa: PLW1641
                 return pendings[0] if pendings else None
             return pendings[:n]
 
+    def lock_and_set_trial_evaluating(self, trial_id: str, worker_id: str) -> None:
+        """Mark a pending trial as being evaluated by `worker_id`.
+
+        Raises:
+            ScaleFMError: If the trial is not pending.
+        """
+        with self._trial_lock.lock():
+            trial = self._trial_repo.load_trial_from_disk(trial_id)
+            if trial.metadata.state != Trial.State.PENDING:
+                raise ScaleFMError(
+                    f"Trial '{trial_id}' is {trial.metadata.state.value}, not pending."
+                )
+            trial.set_evaluating(time_started=time.time(), worker_id=worker_id)
+            self._trial_repo.update_trial(trial, hints="metadata")
+
     def lock_and_get_current_evaluating_trials(self) -> list[Trial]:
         """Get the current evaluating trials."""
         with self._trial_lock.lock():
