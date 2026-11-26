@@ -529,4 +529,5 @@ def predict_full(fit: GPPosteriorFit, target_flops: float) -> dict[str, Any]:
         "pareto_configs": [],
         "pareto_flops": [],
         "pareto_losses": [],
+        "pareto_fit_start": 0,
     }

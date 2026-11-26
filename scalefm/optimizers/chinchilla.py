@@ -318,7 +318,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
             if getattr(param, "is_compute_scaling", False)
             and param_name != self.data_parameter_name
         }
-        logger.info(f"grid for model params {model_params_grid}")
+        logger.debug(f"grid for model params {model_params_grid}")
 
         param_names = list(model_params_grid.keys())
 
@@ -376,7 +376,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
             logger.debug(config_list)
 
         used_flops = sum([self._flops(conf) for conf in config_list])
-        logger.info(f"used flops {used_flops:.2e}")
+        logger.debug(f"used flops {used_flops:.2e}")
 
         action_probabilities = torch.tensor([1.0 / len(param_names)] * len(param_names))
         action_count = 0
@@ -384,7 +384,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
         exhausted_dims: set[str] = set()
         while used_flops < self.max_evaluation_flops:
             if len(exhausted_dims) == len(param_names):
-                logger.info("All parameters have reached their grid maximums.")
+                logger.debug("All parameters have reached their grid maximums.")
                 break
 
             action = self._choose_action_with_sobol(action_probabilities, action_count)
@@ -400,7 +400,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
             next_idx = current_idx + 1
 
             if next_idx >= len(model_params_grid[param_name]):
-                logger.info(f"Exhausted grid for parameter '{param_name}'.")
+                logger.debug(f"Exhausted grid for parameter '{param_name}'.")
                 exhausted_dims.add(param_name)
                 action_probabilities[action] = 0.0
                 if action_probabilities.sum() > 0:
@@ -452,7 +452,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
                     or (estimated_flops > self.max_flops)
                     or (estimated_flops < self.min_flops)
                 ):
-                    logger.info(
+                    logger.debug(
                         f"Cannot add config {copy_current} due to FLOPs constraint. "
                         f"Used: {used_flops:.2e}, Estimated: {estimated_flops:.2e}, "
                         f"Max: {self.max_evaluation_flops:.2e}"
@@ -476,7 +476,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
     ) -> tuple[list[dict[str, Any]], ModelConfigs]:
 
         iso_flops = self._generate_iso_flop_list(num_steps=self.iso_flop_steps)
-        logger.info(
+        logger.debug(
             f"Generated {len(iso_flops)} ISO-FLOP values:"
             f" {[f'{f:.2e}' for f in iso_flops]}... (total: {sum(iso_flops):.2e})"
         )
@@ -539,7 +539,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
             next_idx = current_idx + 1
 
             if next_idx >= len(scaling_non_data_grid[param_name]):
-                logger.info(f"Exhausted grid for parameter '{param_name}'.")
+                logger.debug(f"Exhausted grid for parameter '{param_name}'.")
                 exhausted_dims.add(param_name)
                 action_probabilities[action] = 0.0
                 if action_probabilities.sum() > 0:
@@ -570,7 +570,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
                 conf = config.copy()
                 estimated_flops = self._flops(conf)
                 if estimated_flops > self.max_flops:
-                    logger.info(
+                    logger.debug(
                         f"Config {conf} exceeds max FLOPs ({self.max_flops:.2e})."
                         " Skipping."
                     )
@@ -581,7 +581,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
                     if len(configs_per_iso_flop[flops]) <= num_candidate_per_iso_flop
                 ]
                 if not available_brackets:
-                    logger.info(
+                    logger.debug(
                         f"No available ISO-FLOP brackets for config {conf} with"
                         f" estimated FLOPs {estimated_flops:.2e}. Skipping."
                     )
@@ -594,7 +594,7 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
                 if closest_flop_bin in param_chosen_iso_flops:
                     continue
                 if replace:
-                    logger.info(
+                    logger.debug(
                         f"Replacing config in ISO-FLOP bin {closest_flop_bin:.2e}"
                         f" with config {conf} due to lack of available brackets."
                         f" Estimated FLOPs: {estimated_flops:.2e}"
@@ -625,13 +625,13 @@ class ChinchillaGuidedScaling(ScalingOptimizer):
             conf for configs in configs_per_iso_flop.values() for conf in configs
         ]
 
-        logger.info(
+        logger.debug(
             f"Generated {len(config_list)} configs across"
             f" {len(configs_per_iso_flop)} ISO-FLOP levels,"
             f" total FLOPs: {used_flops:.2e} / {self.max_evaluation_flops:.2e}"
         )
 
-        logger.info(f"Selected {len(config_list)} unique model configs for approach2")
+        logger.debug(f"Selected {len(config_list)} unique model configs for approach2")
         selected_model_configs = self.get_all_possible_model_configs(non_scaling_params)
         return config_list, selected_model_configs
 

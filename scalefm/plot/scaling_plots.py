@@ -123,6 +123,25 @@ def _with_frontier(table: pd.DataFrame, cost: str, loss: str) -> pd.DataFrame:
     return table.assign(on_frontier=pareto_efficient(table[[cost, loss]].to_numpy(float)))
 
 
+def _with_fit_start(runs: pd.DataFrame, cost: str, loss: str, law: str) -> pd.DataFrame:
+    """`runs` with whether each frontier run is in the fit of `law`, and the cost the
+    fit starts at.
+
+    A power law skips the low-compute plateau of the frontier, see
+    `scaling_regime_start`; the other laws fit every run.
+    """
+    from scalefm.utils.power_law import scaling_regime_start
+
+    runs = runs.assign(in_fit=runs["on_frontier"])
+    if law != "power_law" or runs.empty:
+        return runs
+    front = runs[runs["on_frontier"]].sort_values([cost, loss], kind="stable")
+    start = scaling_regime_start(front[cost], front[loss])
+    if start > 0:
+        runs.loc[front.index[:start], "in_fit"] = False
+    return runs
+
+
 def runs_table(trials: Sequence[Trial]) -> pd.DataFrame:
     """One row per successful trial with a positive cost: its cost, loss, whether it is
     on the Pareto frontier, the numbers of its config and `info_dict`, its inference
@@ -225,11 +244,13 @@ def _draw_fit(
     largest_run: float,
     label: str,
     rounded: bool = False,  # noqa: FBT001, FBT002
+    extrapolation_start: float | None = None,
 ) -> None:
     """The fit of `column`, solid over the runs and dashed beyond the largest one, if
     it is drawn there, its predictions at the target costs, and the extrapolation
-    region shaded. A prediction rounded to the search space is joined to the fit by a
-    thin line, or with `rounded` the fit is drawn rounded too.
+    region shaded from `extrapolation_start`, the largest run by default. A
+    prediction rounded to the search space is joined to the fit by a thin line, or
+    with `rounded` the fit is drawn rounded too.
     """
     line = fit[~fit["target"]]
     inside = line[line[cost] <= largest_run]
@@ -260,7 +281,7 @@ def _draw_fit(
     ax.set(xscale="log", yscale="log")
     xmin, xmax = ax.get_xlim()
     ax.axvspan(
-        largest_run,
+        largest_run if extrapolation_start is None else extrapolation_start,
         xmax,
         color=EXTRAPOLATION_COLOR,
         zorder=0,
@@ -269,13 +290,30 @@ def _draw_fit(
     ax.set_xlim(xmin, xmax)
 
 
-def plot_loss_over_cost(
-    runs: pd.DataFrame, loss: str, cost: str, fit: pd.DataFrame, label: str
-) -> Figure:
-    """Every run's `loss` over its `cost`, their Pareto frontier, and the fit `label`
-    extended to the target costs, with its predictions there.
+def _frontier_parts(runs: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The frontier runs in the fit and those left out of it, all in it without an
+    `in_fit` column.
     """
     front = runs[runs["on_frontier"]]
+    if "in_fit" not in front:
+        return front, front.iloc[:0]
+    in_fit = front["in_fit"].astype(bool)
+    return front[in_fit], front[~in_fit]
+
+
+def plot_loss_over_cost(
+    runs: pd.DataFrame,
+    loss: str,
+    cost: str,
+    fit: pd.DataFrame,
+    label: str,
+    extrapolation_start: float | None = None,
+) -> Figure:
+    """Every run's `loss` over its `cost`, their Pareto frontier, and the fit `label`
+    extended to the target costs, with its predictions there. The extrapolation
+    region starts at `extrapolation_start`, the largest run by default.
+    """
+    fitted, skipped = _frontier_parts(runs)
     cost_label = cost.replace("_", " ")
 
     fig = Figure(figsize=(6.4, 4.2))
@@ -289,8 +327,8 @@ def plot_loss_over_cost(
         label="Runs",
     )
     ax.scatter(
-        front[cost],
-        front[loss],
+        fitted[cost],
+        fitted[loss],
         s=44,
         color=PARETO_COLOR,
         edgecolors="white",
@@ -298,8 +336,27 @@ def plot_loss_over_cost(
         zorder=3,
         label="Pareto frontier",
     )
+    if not skipped.empty:
+        ax.scatter(
+            skipped[cost],
+            skipped[loss],
+            s=44,
+            facecolors="white",
+            edgecolors=PARETO_COLOR,
+            linewidths=1.4,
+            zorder=3,
+            label="Pareto, not fitted",
+        )
     if loss in fit:
-        _draw_fit(ax, fit, cost, loss, runs[cost].max(), label)
+        _draw_fit(
+            ax,
+            fit,
+            cost,
+            loss,
+            runs[cost].max(),
+            label,
+            extrapolation_start=extrapolation_start,
+        )
         targets = fit[fit["target"]]
         for i, (x, y) in enumerate(zip(targets[cost], targets[loss], strict=True)):
             # Above and below in turn, so the labels of close targets do not overlap
@@ -324,20 +381,22 @@ def plot_parameter_over_cost(
     fit: pd.DataFrame,
     label: str,
     rounded: bool = False,  # noqa: FBT001, FBT002
+    extrapolation_start: float | None = None,
 ) -> Figure:
     """One parameter of every run over its `cost`, coloured by loss, with the runs on
     the Pareto frontier circled and what the fit `label` predicts for it, if it can,
-    with `rounded` drawn rounded to the search space.
+    with `rounded` drawn rounded to the search space. The extrapolation region starts
+    at `extrapolation_start`, the largest run by default.
     """
-    front = runs[runs["on_frontier"]]
+    fitted, skipped = _frontier_parts(runs)
     cost_label = cost.replace("_", " ")
 
     fig = Figure(figsize=(7, 4.2))
     ax = fig.add_subplot()
     points = ax.scatter(runs[cost], runs[parameter], c=runs["loss"], s=30, zorder=2)
     ax.scatter(
-        front[cost],
-        front[parameter],
+        fitted[cost],
+        fitted[parameter],
         s=110,
         facecolors="none",
         edgecolors=PARETO_COLOR,
@@ -345,10 +404,43 @@ def plot_parameter_over_cost(
         zorder=3,
         label="Pareto frontier",
     )
+    if not skipped.empty:
+        ax.scatter(
+            skipped[cost],
+            skipped[parameter],
+            s=110,
+            facecolors="none",
+            edgecolors=PARETO_COLOR,
+            linewidths=1.2,
+            linestyle="--",
+            alpha=0.6,
+            zorder=3,
+            label="Pareto, not fitted",
+        )
     if parameter in fit:
-        _draw_fit(ax, fit, cost, parameter, runs[cost].max(), label, rounded)
+        _draw_fit(
+            ax,
+            fit,
+            cost,
+            parameter,
+            runs[cost].max(),
+            label,
+            rounded=rounded,
+            extrapolation_start=extrapolation_start,
+        )
     ax.set(xscale="log", yscale="log")
     _style(ax, f"{parameter} over {cost_label}", cost_label.capitalize(), parameter)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=3,
+        frameon=False,
+        fontsize=9,
+        labelcolor=SECONDARY_INK,
+    )
     fig.colorbar(points, ax=ax, label="Loss")
     return fig
 
@@ -388,10 +480,14 @@ def plot_scaling(
     space: SearchSpace | None = None,
     estimators: Estimators | None = None,
     rounded_fit: bool = False,  # noqa: FBT001, FBT002
+    max_cost_per_config: float | None = None,
 ) -> list[Artifact]:
     """The scaling plots and predictions of the loss and of each downstream metric,
     over the cost and, if reported, the inference cost, if any successful run reports
     a cost.
+
+    Over the cost, the extrapolation region starts at `max_cost_per_config`, the
+    largest cost the run could sample, if given, and at the largest run otherwise.
 
     Over the cost, the fit is `predictor`, the scaling law of the run's optimizer, and
     over the inference cost a power law, each for what it can predict. They are
@@ -425,9 +521,12 @@ def plot_scaling(
     for metric in ["loss", *downstream]:
         folder = "pre_train" if metric == "loss" else metric.replace(".", "_")
         for cost in costs:
-            runs = _with_frontier(table, cost, metric)
             target_costs = _targets(table, cost, targets)
             law = _law(predictor, cost, estimators)
+            runs = _with_fit_start(_with_frontier(table, cost, metric), cost, metric, law)
+            fitted = runs.loc[runs["in_fit"], cost]
+            # The fit is drawn from the first run it fits, past any plateau
+            start = fitted.min() if not fitted.empty else runs[cost].min()
             provides = [t for t in Target if t in get_predictor_type(law).provides]
             if law == "gp_posterior":
                 # Each GP point is its own search over configs, so the curve beyond
@@ -435,16 +534,20 @@ def plot_scaling(
                 num, end = NUM_GP_FIT_POINTS, runs[cost].max()
             else:
                 num, end = NUM_FIT_POINTS, max(target_costs)
-            xs = list(np.geomspace(runs[cost].min(), end, num))
+            xs = list(np.geomspace(start, end, num))
             fit = predict_over(
                 runs, metric, cost, law, xs + target_costs, provides, space, estimators
             )
             fit["target"] = [False] * len(xs) + [True] * len(target_costs)
             label = f"{law} fit"
+            # The cap is on the training cost only
+            extrapolation_start = max_cost_per_config if cost == "cost" else None
 
             name = f"{folder}/{_name(metric)}_over_{cost}"
-            figure = plot_loss_over_cost(runs, metric, cost, fit, label)
-            points = runs[["trial_id", cost, metric, "on_frontier"]]
+            figure = plot_loss_over_cost(
+                runs, metric, cost, fit, label, extrapolation_start
+            )
+            points = runs[["trial_id", cost, metric, "on_frontier", "in_fit"]]
             artifacts += [
                 Artifact(name, figure, ArtifactType.FIGURE),
                 Artifact(name, points, ArtifactType.CSV),
@@ -463,7 +566,13 @@ def plot_scaling(
             for parameter in parameters:
                 name = f"{folder}/parameters/{parameter.replace('.', '_')}_over_{cost}"
                 figure = plot_parameter_over_cost(
-                    runs, parameter, cost, fit, label, rounded_fit
+                    runs,
+                    parameter,
+                    cost,
+                    fit,
+                    label,
+                    rounded=rounded_fit,
+                    extrapolation_start=extrapolation_start,
                 )
                 artifacts.append(Artifact(name, figure, ArtifactType.FIGURE))
     return artifacts

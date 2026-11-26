@@ -317,6 +317,8 @@ class DefaultWorker:
             trials,
             subset_worker_id,
             include_in_progress=include_in_progress,
+            # In async mode, sampling is what spends the budget
+            include_pending=self.settings.is_async,
         )
 
     def _check_global_stopping_criterion(  # noqa: C901
@@ -517,10 +519,13 @@ class DefaultWorker:
                         logger.info(should_stop)
                         return "break"
 
+                # In async mode, pending trials wait for a job (see
+                # `fetch_pending_trials`), so this worker only samples new ones
                 pending_trials = [
                     trial
                     for trial in trials.values()
                     if trial.metadata.state == Trial.State.PENDING
+                    and not self.settings.is_async
                 ]
 
                 if len(pending_trials) > 0:
@@ -555,10 +560,12 @@ class DefaultWorker:
                 sampled_trials[1:]
 
             with self.state._trial_lock.lock(worker_id=self.worker_id), gc_disabled():
-                this_workers_trial.set_evaluating(
-                    time_started=time.time(),
-                    worker_id=self.worker_id,
-                )
+                # In async mode, the trial stays pending until a job takes it
+                if not self.settings.is_async:
+                    this_workers_trial.set_evaluating(
+                        time_started=time.time(),
+                        worker_id=self.worker_id,
+                    )
                 try:
                     self.state._trial_repo.store_new_trial(sampled_trials)
                     if isinstance(sampled_trials, Trial):
@@ -714,6 +721,10 @@ class DefaultWorker:
 
                 continue
 
+            if self.settings.is_async:
+                # Only sampled: the trial stays pending until a job takes it
+                continue
+
             # We (this worker) has managed to set it to evaluating, now we can evaluate it
             with _set_global_trial(trial_to_eval):
                 evaluated_trial, report = evaluate_trial(
@@ -723,13 +734,6 @@ class DefaultWorker:
                 )
 
             if report is None:
-                if self.settings.is_async:
-                    logger.info(
-                        "Worker '%s' launched trial '%s' asynchronously.",
-                        self.worker_id,
-                        evaluated_trial.id,
-                    )
-                    continue
                 raise ValueError(
                     f"The evaluation of trial '{evaluated_trial.id}' returned None."
                     " Return a result, or, to evaluate configs elsewhere, call"

@@ -15,6 +15,8 @@ from scalefm.utils.power_law import (
     PowerLawMeanParams,
     fit_power_law,
     fit_power_law_mean_params,
+    fit_power_law_with_offset,
+    scaling_regime_start,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,8 +28,10 @@ __all__ = [
     "ScalingLawParameters",
     "fit_power_law",
     "fit_power_law_mean_params",
+    "fit_power_law_with_offset",
     "get_power_law_curvature",
     "predict_from_loglog_fit",
+    "scaling_regime_start",
 ]
 
 
@@ -37,7 +41,11 @@ def predict_from_loglog_fit(
     log_scale: bool = True,  # noqa: FBT001, FBT002
     z_score: float = 1.96,
 ) -> tuple[float, float, float]:
-    """Predict loss at target FLOPs and return mean/upper/lower (95% CI default)."""
+    """Predict loss at target FLOPs and return mean/upper/lower (95% CI default).
+
+    In log scale, the offset of the fit is added back, the interval is that of the
+    power law given the offset.
+    """
     if target_flop <= 0:
         raise ValueError("target_flop must be positive for log-log prediction")
 
@@ -56,6 +64,9 @@ def predict_from_loglog_fit(
     if log_scale:
         y_upper = float(np.power(10.0, y_upper))
         y_lower = float(np.power(10.0, y_lower))
+        predicted_y += fit.offset
+        y_upper += fit.offset
+        y_lower += fit.offset
     return predicted_y, y_upper, y_lower
 
 
