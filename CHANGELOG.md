@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-26
+
 ### Changed
 - predict() and the scaling plots log one short line each. The fitted paramters are logged at debug level only.
 ### Added
