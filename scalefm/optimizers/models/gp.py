@@ -241,7 +241,7 @@ class ScanKernel(Kernel):
     ) -> None:
         lengthscale_prior = LogNormalPrior(
             loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
-        )
+        )  # As in get_covar_module_with_dim_scaled_prior()
         super().__init__(
             ard_num_dims=ard_num_dims,
             active_dims=active_dims,  # type: ignore[arg-type]

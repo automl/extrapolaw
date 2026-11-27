@@ -7,11 +7,11 @@ from botorch.models import SingleTaskGP
 from gpytorch import ExactMarginalLogLikelihood
 from gpytorch.kernels import RBFKernel
 
-from extrapolaw.optimizers import bayesian_optimization as bo_module
-from extrapolaw.optimizers.models.gp import ScanKernel, make_single_obj_gp
-from extrapolaw.space import HPOCategorical, HPOFloat
-from extrapolaw.space.encoding import ConfigEncoder
-from extrapolaw.state import BudgetInfo, Trial
+from scalefm.optimizers import bayesian_optimization as bo_module
+from scalefm.optimizers.models.gp import ScanKernel, make_single_obj_gp
+from scalefm.space import HPOCategorical, HPOFloat
+from scalefm.space.encoding import ConfigEncoder
+from scalefm.state import BudgetInfo, Trial
 from tests.test_optimizers.test_budget_schedule import _optimizer, _trial
 
 ENCODER = ConfigEncoder.from_parameters(
